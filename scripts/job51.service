@@ -1,0 +1,17 @@
+[Unit]
+Description=51job Job Scraper Web App
+After=network.target
+
+[Service]
+Type=simple
+User=opc_uname
+WorkingDirectory=/home/opc_uname/cc_workspace/job51-scraper
+ExecStart=/home/opc_uname/cc_workspace/job51-scraper/venv/bin/python3 -m src.app
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=job51-app
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+venv/
+data/jobs.db
+data/jobs.json
+data/jobs.csv
+data/stats.json
+data/history/*.json
+*.log
+.env
