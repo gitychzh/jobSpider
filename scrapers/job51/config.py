@@ -1,6 +1,5 @@
-"""统一配置管理 - 城市列表、API参数、路径等"""
-import os
-from dataclasses import dataclass, field
+"""51job 配置 — 城市代码、API参数"""
+from dataclasses import dataclass
 from typing import Dict
 
 # ─── 城市配置 ───────────────────────────────────
@@ -22,13 +21,12 @@ class ApiParams:
     api_key: str = "51job"
     search_type: str = "2"
     keyword_type: str = "2"
-    issue_date: str = "4"       # 近1个月
+    issue_date: str = "4"
     sort_type: str = "0"
     page_size: str = "20"
     source: str = "1"
     page_code: str = "sou|sou|soulb"
     scene: str = "7"
-    # 以下字段默认空但保留
     keyword: str = ""
     function: str = ""
     industry: str = ""
@@ -75,17 +73,6 @@ class ApiParams:
             'scene': self.scene,
         }
 
-
-# ─── 路径配置 ────────────────────────────────────
-PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(PROJECT_DIR, "data")
-SCRIPTS_DIR = os.path.join(PROJECT_DIR, "scripts")
-
-DB_PATH = os.path.join(DATA_DIR, "jobs.db")
-JOBS_JSON_PATH = os.path.join(DATA_DIR, "jobs.json")
-JOBS_CSV_PATH = os.path.join(DATA_DIR, "jobs.csv")
-STATS_JSON_PATH = os.path.join(DATA_DIR, "stats.json")
-HISTORY_DIR = os.path.join(DATA_DIR, "history")
 
 # ─── 爬虫默认参数 ────────────────────────────────
 DEFAULT_PAGES_PER_CITY = 5

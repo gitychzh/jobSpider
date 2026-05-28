@@ -1,0 +1,42 @@
+name: Scrape & Deploy
+
+on:
+  schedule:
+    # 北京时间 10:00 = UTC 02:00
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      pages_per_city:
+        description: '每城市爬取页数'
+        required: false
+        default: '5'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium --with-deps
+
+      - name: Run scrapers
+        run: |
+          python -m scrapers.runner --source job51 --pages ${Pages}
+        env:
+          Pages: ${{ github.event.inputs.pages_per_city || '5' }}
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./web
+          publish_branch: gh-pages
+          force_orphan: true

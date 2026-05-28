@@ -9,11 +9,10 @@ from typing import Optional, Dict, Tuple
 from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
 
-from src.config import CITIES
+from scrapers.job51.config import CITIES
 
 __all__ = ['ensure_browser', 'get_cookies', 'close_browser']
 
-# ─── 浏览器缓存 ───────────────────────────────────
 _playwright_instance = None
 _browser = None
 _browser_context = None
@@ -49,14 +48,7 @@ def ensure_browser() -> Tuple:
 
 
 def get_cookies(city_code: Optional[str] = None) -> Optional[Dict[str, str]]:
-    """Playwright 打开搜索页 → 等 WAF 通过 → 取 cookies。
-
-    Args:
-        city_code: 指定城市代码（WAF 拦截重试时使用），None 则用第一个城市
-
-    Returns:
-        cookies dict {'name': 'value'} 或 None（失败）
-    """
+    """Playwright 打开搜索页 → 等 WAF 通过 → 取 cookies"""
     try:
         browser, ctx = ensure_browser()
         page = ctx.new_page()
@@ -69,7 +61,6 @@ def get_cookies(city_code: Optional[str] = None) -> Optional[Dict[str, str]]:
         page.goto(url, timeout=30000, wait_until='domcontentloaded')
         time.sleep(3)
 
-        # 等待 joblist 加载（WAF 验证完成）
         for _ in range(15):
             cnt = page.evaluate("document.querySelectorAll('.joblist-item').length")
             if cnt >= 5:
@@ -81,12 +72,12 @@ def get_cookies(city_code: Optional[str] = None) -> Optional[Dict[str, str]]:
         return {c['name']: c['value'] for c in cookie_list} if cookie_list else None
 
     except Exception as e:
-        print(f"  ⚠️ Playwright WAF 验证失败: {e}")
+        print(f"  Playwright WAF 验证失败: {e}")
         return None
 
 
 def close_browser():
-    """关闭浏览器实例（爬取结束后调用，释放资源）"""
+    """关闭浏览器实例"""
     global _playwright_instance, _browser, _browser_context
     if _browser:
         try:
