@@ -25,9 +25,6 @@ function switchSource(source) {
         btn.classList.toggle('active', btn.dataset.source === source);
     });
 
-    // 更新城市下拉
-    updateCityFilter(source);
-
     // 加载数据或显示coming-soon
     const cfg = SOURCE_CONFIG[source];
     if (cfg && cfg.available) {
@@ -134,6 +131,7 @@ async function loadJobs(page) {
 
     renderJobList(pageData, currentKeyword);
     renderPagination(page, totalPages);
+    updateCityFilter(currentSource);
     loadStats();
 }
 
