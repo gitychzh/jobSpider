@@ -1,20 +1,38 @@
 """
 51job 多城市爬虫 — 核心逻辑
-Playwright 过 WAF → requests 调 API → 多城市爬取 → 返回统一JobDict
+全程使用 Playwright 在浏览器内调 API，绕过阿里云 WAF
+策略：只访问一次搜索页过WAF，后续全用 JS fetch  API
 """
 import time
 import random
-import requests
 from datetime import datetime, timezone
 from typing import Dict, List
 
 from scrapers.base import BaseScraper
-from scrapers.job51.config import CITIES, API_BASE, ApiParams, DEFAULT_PAGES_PER_CITY
-from scrapers.job51.browser import get_cookies, close_browser
+from scrapers.job51.config import CITIES, ApiParams, DEFAULT_PAGES_PER_CITY
+from scrapers.job51.browser import ensure_browser, close_browser
+
+JS_FETCH_API = """
+async (params) => {
+    const url = 'https://we.51job.com/api/job/search-pc?' + new URLSearchParams(params).toString();
+    try {
+        const res = await fetch(url, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {'Accept': 'application/json, text/plain, */*'}
+        });
+        if (!res.ok) return {error: 'HTTP ' + res.status};
+        const text = await res.text();
+        if (text.startsWith('<') || text.length < 100) return {error: 'WAF拦截'};
+        return JSON.parse(text);
+    } catch(e) {
+        return {error: e.message};
+    }
+}
+"""
 
 
 class Job51Scraper(BaseScraper):
-    """51job 招聘信息爬虫"""
 
     @property
     def name(self) -> str:
@@ -25,7 +43,7 @@ class Job51Scraper(BaseScraper):
         return '51job'
 
     def scrape(self, pages_per_city: int = DEFAULT_PAGES_PER_CITY) -> List[Dict]:
-        """爬取所有城市数据，返回统一JobDict列表"""
+        """爬取所有城市数据"""
         start = time.time()
         now_utc = datetime.now(timezone.utc)
         print(f"\n{'='*55}")
@@ -33,75 +51,77 @@ class Job51Scraper(BaseScraper):
         print(f"   {list(CITIES.keys())} | 各{pages_per_city}页 | 近1个月")
         print(f"{'='*55}")
 
-        # 1. Playwright 过 WAF 获取初始 cookies
-        cookies = get_cookies()
-        if not cookies:
-            print("WAF 验证失败，无法获取 cookies")
+        browser, ctx = ensure_browser()
+        if not browser or not browser.is_connected():
+            print("浏览器启动失败")
+            return []
+
+        # 只访问一次搜索页，通过 WAF
+        page = ctx.new_page()
+        first_code = list(CITIES.values())[0]
+        search_url = (
+            f"https://we.51job.com/pc/search?keyword=&keywordType=2"
+            f"&jobArea={first_code}&issuedDate=4&pageNum=1&pageSize=20"
+        )
+        try:
+            page.goto(search_url, timeout=30000, wait_until='domcontentloaded')
+            # 等WAF验证完成：页面有joblist或等待足够久
+            waf_ok = False
+            for _ in range(30):
+                try:
+                    cnt = page.evaluate("document.querySelectorAll('.joblist-item').length")
+                    if cnt >= 1:
+                        waf_ok = True
+                        break
+                except Exception:
+                    pass
+                time.sleep(1)
+            if not waf_ok:
+                # 即使没检测到joblist，也等够了，可能页面结构变了
+                print("  WAF等待超时，继续尝试API调用")
+            else:
+                print("  WAF验证通过")
+        except Exception as e:
+            print(f"  搜索页加载失败: {e}")
+            page.close()
             close_browser()
             return []
 
-        # 2. 全局去重
         all_seen: set = set()
         all_jobs: list = []
 
-        # 3. 逐城市爬取
         for city, code in CITIES.items():
             print(f"\n-- [{city}] code={code} --")
-            city_jobs = self._scrape_city(cookies, city, code, pages_per_city, all_seen)
+            city_jobs = self._scrape_city_in_browser(page, city, code, pages_per_city, all_seen)
             all_jobs.extend(city_jobs)
             print(f"  {city}: {len(city_jobs)} 条")
-            time.sleep(random.uniform(1, 3))
 
-        # 4. 关闭浏览器
+        page.close()
         close_browser()
-
         print(f"\n完成! 共 {len(all_jobs)} 条, {time.time() - start:.0f}秒")
         return all_jobs
 
-    def _scrape_city(self, cookies, city, code, pages, all_seen):
-        """用 requests 调 API 爬一个城市的多页数据"""
+    def _scrape_city_in_browser(self, page, city, code, pages, all_seen):
+        """在同一页面内逐页调 API"""
         jobs, seen = [], set()
         api_params = ApiParams()
-
-        s = requests.Session()
-        for name, value in cookies.items():
-            s.cookies.set(name, value, domain='.51job.com', path='/')
-        s.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/134.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Referer': 'https://we.51job.com/pc/search',
-            'Origin': 'https://we.51job.com',
-        })
-
-        waf_retried = False
 
         for pg in range(1, pages + 1):
             print(f"  第{pg}/{pages}页 ", end="", flush=True)
             params = api_params.to_dict(job_area=code, page_num=pg)
 
             try:
-                time.sleep(random.uniform(1, 3))
-                r = s.get(API_BASE, params=params, timeout=15)
+                time.sleep(random.uniform(0.5, 1.5))
+                data = page.evaluate(JS_FETCH_API, params)
 
-                ct = r.headers.get('content-type', '')
-                if 'text/html' in ct or len(r.text) < 100:
-                    if not waf_retried:
-                        print(f"WAF拦截 (用[{city}]重新获取cookie)")
-                        new_cookies = get_cookies(city_code=code)
-                        if new_cookies:
-                            s.cookies.clear()
-                            for name, value in new_cookies.items():
-                                s.cookies.set(name, value, domain='.51job.com', path='/')
-                            r = s.get(API_BASE, params=params, timeout=15)
-                            waf_retried = True
-                        else:
-                            print(f"cookie获取失败，跳过剩余页")
-                            break
-                    else:
-                        print(f"WAF二次拦截，跳过剩余页")
+                if isinstance(data, dict) and 'error' in data:
+                    err = data['error']
+                    if 'WAF' in err:
+                        print(f"WAF拦截，跳过剩余页")
                         break
+                    print(f"错误: {err}, 跳过剩余页")
+                    break
 
-                data = r.json()
                 job_list = data.get('resultbody', {}).get('job', {}).get('items', [])
             except Exception as e:
                 print(f"错误: {e}")
@@ -115,7 +135,7 @@ class Job51Scraper(BaseScraper):
             added = 0
             for j in job_list:
                 jid = str(j.get('jobId', ''))
-                title = j.get('jobName', '').strip()
+                title = (j.get('jobName') or '').strip()
                 if not jid or not title:
                     continue
                 if jid in all_seen or jid in seen:
@@ -123,19 +143,18 @@ class Job51Scraper(BaseScraper):
                 seen.add(jid)
                 all_seen.add(jid)
 
-                # 统一JobDict格式，添加source字段
                 jobs.append({
                     'job_id': jid,
                     'job_name': title,
-                    'company_name': j.get('companyName', '').strip(),
-                    'salary': j.get('provideSalaryString', '').strip(),
-                    'work_area': j.get('jobAreaString', '').strip(),
-                    'work_year': j.get('workYearString', '').strip(),
-                    'education': j.get('degreeString', '').strip(),
-                    'issue_date': j.get('issueDateString', '').strip(),
-                    'confirm_date': j.get('confirmDateString', '').strip(),
-                    'update_time': j.get('updateDateTime', '').strip(),
-                    'job_url': j.get('jobHref', ''),
+                    'company_name': (j.get('companyName') or '').strip(),
+                    'salary': (j.get('provideSalaryString') or '').strip(),
+                    'work_area': (j.get('jobAreaString') or '').strip(),
+                    'work_year': (j.get('workYearString') or '').strip(),
+                    'education': (j.get('degreeString') or '').strip(),
+                    'issue_date': (j.get('issueDateString') or '').strip(),
+                    'confirm_date': (j.get('confirmDateString') or '').strip(),
+                    'update_time': (j.get('updateDateTime') or '').strip(),
+                    'job_url': j.get('jobHref') or '',
                     'city': city,
                     'scrape_date': now,
                     'source': self.name,
