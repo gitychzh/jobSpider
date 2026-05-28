@@ -121,8 +121,15 @@ async function loadJobs(page) {
         );
     }
 
-    // 排序：issue_date 降序
-    filtered.sort((a, b) => (b.issue_date || '').localeCompare(a.issue_date || ''));
+    // 排序
+    const sortField = document.getElementById('sortField').value || 'issue_date';
+    const sortOrder = document.getElementById('sortOrder').value || 'desc';
+    filtered.sort((a, b) => {
+        const va = (a[sortField] || '');
+        const vb = (b[sortField] || '');
+        const cmp = va.localeCompare(vb);
+        return sortOrder === 'desc' ? -cmp : cmp;
+    });
 
     const total = filtered.length;
     const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
