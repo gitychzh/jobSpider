@@ -1,14 +1,16 @@
 /**
- * app.js — 主逻辑：数据加载、搜索、筛选、分页、平台切换
+ * app.js — 主逻辑：从 Cloudflare D1 API 加载数据，搜索、筛选、分页、平台切换
  */
 const PER_PAGE = 50;
+const API_BASE = 'https://jobspider-api.93921526.workers.dev';
+
 const AVAILABLE_SOURCES = ['job51', 'zhilian', 'boss'];
 
 let currentSource = 'job51';
 let currentPage = 1;
 let currentKeyword = '';
 let currentCity = '';
-let allJobsCache = {};
+let sourceDataCache = {};  // Cache total counts per source
 
 // ─── 平台切换 ────────────────────────────
 function switchSource(source) {
@@ -35,66 +37,35 @@ function switchSource(source) {
 }
 
 // ─── 城市下拉 ────────────────────────────
-function updateCityFilter(source) {
+async function updateCityFilter(source) {
     const sel = document.getElementById('cityFilter');
     sel.innerHTML = '<option value="">全部城市</option>';
-    const data = allJobsCache[source];
-    if (!data || !data.jobs) return;
 
-    const cities = {};
-    data.jobs.forEach(j => { if (j.city) cities[j.city] = (cities[j.city] || 0) + 1; });
-    Object.entries(cities).sort((a, b) => b[1] - a[1]).forEach(([c, n]) => {
-        const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = `${c} (${n})`;
-        sel.appendChild(opt);
-    });
+    try {
+        const res = await fetch(`${API_BASE}/api/cities?source=${source}`);
+        if (!res.ok) return;
+        const cities = await res.json();
+        cities.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.city;
+            opt.textContent = `${c.city} (${c.count})`;
+            sel.appendChild(opt);
+        });
+    } catch (e) {
+        // Fallback: try from cache
+        const data = sourceDataCache[source];
+        if (data && data.by_city) {
+            Object.entries(data.by_city).sort((a, b) => b[1] - a[1]).forEach(([c, n]) => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = `${c} (${n})`;
+                sel.appendChild(opt);
+            });
+        }
+    }
 }
 
 // ─── 数据加载 ────────────────────────────
-async function loadSourceData(source) {
-    if (allJobsCache[source]) return allJobsCache[source];
-    renderLoading();
-
-    try {
-        const res = await fetch(`data/${source}.json`);
-        if (!res.ok) {
-            allJobsCache[source] = { available: false };
-            return allJobsCache[source];
-        }
-        const data = await res.json();
-        data.available = true;
-        allJobsCache[source] = data;
-        return data;
-    } catch (e) {
-        allJobsCache[source] = { available: false };
-        return allJobsCache[source];
-    }
-}
-
-async function loadStats() {
-    try {
-        const res = await fetch('data/stats.json');
-        if (!res.ok) return;
-        const stats = await res.json();
-
-        // 取当前平台的统计
-        const scraperStats = stats.scrapers && stats.scrapers[currentSource];
-        if (scraperStats) {
-            renderStats({
-                total_jobs: scraperStats.total_jobs || 0,
-                unique_companies: scraperStats.unique_companies || 0,
-                by_city: scraperStats.by_city || {},
-                last_update: stats.last_update || '',
-            });
-        } else {
-            renderStats({ total_jobs: 0, unique_companies: 0, by_city: {}, last_update: stats.last_update || '' });
-        }
-    } catch (e) {
-        // 忽略
-    }
-}
-
 async function loadJobs(page) {
     currentPage = page;
     currentCity = document.getElementById('cityFilter').value;
@@ -102,44 +73,52 @@ async function loadJobs(page) {
 
     renderLoading();
 
-    const data = await loadSourceData(currentSource);
-    if (!data.available || !data.jobs) {
-        renderComingSoon(currentSource);
-        return;
-    }
-
-    // 纯前端筛选
-    let filtered = data.jobs;
-    if (currentCity) {
-        filtered = filtered.filter(j => j.city === currentCity);
-    }
-    if (currentKeyword) {
-        const kw = currentKeyword.toLowerCase();
-        filtered = filtered.filter(j =>
-            (j.job_name && j.job_name.toLowerCase().includes(kw)) ||
-            (j.company_name && j.company_name.toLowerCase().includes(kw))
-        );
-    }
-
-    // 排序
-    const sortField = document.getElementById('sortField').value || 'issue_date';
-    const sortOrder = document.getElementById('sortOrder').value || 'desc';
-    filtered.sort((a, b) => {
-        const va = (a[sortField] || '');
-        const vb = (b[sortField] || '');
-        const cmp = va.localeCompare(vb);
-        return sortOrder === 'desc' ? -cmp : cmp;
+    const params = new URLSearchParams({
+        source: currentSource,
+        page: page,
     });
+    if (currentCity) params.set('city', currentCity);
+    if (currentKeyword) params.set('keyword', currentKeyword);
+    params.set('sortField', document.getElementById('sortField').value || 'issue_date');
+    params.set('sortOrder', document.getElementById('sortOrder').value || 'desc');
 
-    const total = filtered.length;
-    const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
-    const start = (page - 1) * PER_PAGE;
-    const pageData = filtered.slice(start, start + PER_PAGE);
+    try {
+        const res = await fetch(`${API_BASE}/api/jobs?${params}`);
+        if (!res.ok) {
+            if (res.status === 400) {
+                renderComingSoon(currentSource);
+                return;
+            }
+            throw new Error(`HTTP ${res.status}`);
+        }
+        const data = await res.json();
 
-    renderJobList(pageData, currentKeyword);
-    renderPagination(page, totalPages);
-    updateCityFilter(currentSource);
-    loadStats();
+        if (!data.jobs || data.jobs.length === 0 && page === 1 && !currentCity && !currentKeyword) {
+            renderComingSoon(currentSource);
+            return;
+        }
+
+        renderJobList(data.jobs, currentKeyword);
+        renderPagination(data.page, data.total_pages);
+        updateCityFilter(currentSource);
+        loadStats(currentSource);
+    } catch (e) {
+        console.error('Failed to load jobs:', e);
+        document.getElementById('jobsList').innerHTML = `
+            <div class="empty-box"><div class="icon">⚠️</div><div class="msg">加载失败，请稍后重试</div></div>`;
+    }
+}
+
+async function loadStats(source) {
+    try {
+        const res = await fetch(`${API_BASE}/api/stats?source=${source}`);
+        if (!res.ok) return;
+        const stats = await res.json();
+        sourceDataCache[source] = stats;
+        renderStats(stats);
+    } catch (e) {
+        // 忽略
+    }
 }
 
 function loadPage(page) {
@@ -152,38 +131,32 @@ function filterJobs() {
 
 // ─── 初始化 ────────────────────────────
 async function init() {
-    // 加载统计数据确定哪些平台可用
-    let availableSet = new Set(['job51']);
-
     try {
-        const res = await fetch('data/stats.json');
+        const res = await fetch(`${API_BASE}/api/sources`);
         if (res.ok) {
-            const stats = await res.json();
-            if (stats.available_sources) {
-                availableSet = new Set(stats.available_sources);
-            }
-        }
-    } catch (e) { /* ignore */ }
+            const data = await res.json();
+            const availableSet = new Set(data.available_sources);
 
-    // 更新 SOURCE_CONFIG
-    for (const src of AVAILABLE_SOURCES) {
-        if (SOURCE_CONFIG[src]) {
-            SOURCE_CONFIG[src].available = availableSet.has(src);
+            for (const src of AVAILABLE_SOURCES) {
+                if (SOURCE_CONFIG[src]) {
+                    SOURCE_CONFIG[src].available = availableSet.has(src);
+                }
+            }
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                const src = btn.dataset.source;
+                if (src && SOURCE_CONFIG[src] && !SOURCE_CONFIG[src].available) {
+                    btn.classList.add('disabled');
+                }
+            });
         }
+    } catch (e) {
+        // Fallback: assume job51 is available
+        console.warn('Failed to load sources, using defaults');
     }
 
-    // 设置tabs
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        const src = btn.dataset.source;
-        if (src && SOURCE_CONFIG[src] && !SOURCE_CONFIG[src].available) {
-            btn.classList.add('disabled');
-        }
-    });
-
-    // 默认加载51job
     switchSource('job51');
 
-    // 搜索回车触发
     document.getElementById('searchBox').addEventListener('keypress', e => {
         if (e.key === 'Enter') filterJobs();
     });

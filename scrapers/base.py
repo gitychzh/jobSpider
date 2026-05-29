@@ -13,12 +13,20 @@ JobDict 统一字段:
 """
 import json
 import os
+import urllib.request
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Dict, List
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_DIR, 'web', 'data')
+
+# Cloudflare D1 API endpoint (set via env CF_API_URL or default)
+CF_API_URL = os.environ.get(
+    'CF_API_URL',
+    'https://jobSpider-api.gitychzh.workers.dev'
+)
+CF_IMPORT_SECRET = os.environ.get('CF_IMPORT_SECRET', 'jobSpider2024secret')
 
 
 class BaseScraper(ABC):
@@ -39,8 +47,7 @@ class BaseScraper(ABC):
         """执行爬取，返回职位列表"""
 
     def save_json(self, jobs: List[Dict]) -> str:
-        """将职位数据保存为JSON文件
-
+        """将职位数据保存为JSON文件（本地备份）
         Returns:
             保存路径
         """
@@ -57,6 +64,41 @@ class BaseScraper(ABC):
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
         return path
+
+    def save_to_d1(self, jobs: List[Dict]) -> bool:
+        """将职位数据保存到 Cloudflare D1 via API"""
+        if not jobs:
+            return True
+
+        batch_size = 50
+        for i in range(0, len(jobs), batch_size):
+            batch = jobs[i:i+batch_size]
+            payload = {
+                'action': 'insert_jobs',
+                'source': self.name,
+                'jobs': batch,
+            }
+            try:
+                req = urllib.request.Request(
+                    f'{CF_API_URL}/api/import',
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers={
+                        'Content-Type': 'application/json',
+                        'X-Import-Secret': CF_IMPORT_SECRET,
+                    },
+                    method='POST',
+                )
+                resp = urllib.request.urlopen(req, timeout=30)
+                result = json.loads(resp.read())
+                if not result.get('success'):
+                    print(f"  D1 batch {i//batch_size+1} failed: {result.get('error')}")
+                    return False
+            except Exception as e:
+                print(f"  D1 batch {i//batch_size+1} error: {e}")
+                return False
+
+        print(f"  D1: {len(jobs)} jobs saved")
+        return True
 
     def generate_stats(self, jobs: List[Dict]) -> Dict:
         """生成统计数据"""

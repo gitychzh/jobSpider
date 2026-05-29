@@ -1,0 +1,11 @@
+name = "jobspider-api"
+main = "api/index.js"
+compatibility_date = "2024-09-23"
+
+[vars]
+IMPORT_SECRET = "jobSpider2024secret"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "jobSpider-db"
+database_id = "9167c8e5-d910-4bd7-bba4-a2bea611cd4f"

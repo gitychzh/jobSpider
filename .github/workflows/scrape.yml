@@ -1,4 +1,4 @@
-name: Scrape & Deploy
+name: Scrape & Push to D1
 
 on:
   schedule:
@@ -7,18 +7,12 @@ on:
   workflow_dispatch:
     inputs:
       pages_per_city:
-        description: '每城市爬��页数'
+        description: '每城市爬取页数'
         required: false
         default: '5'
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
 
 jobs:
   scrape:
@@ -36,27 +30,10 @@ jobs:
           pip install -r requirements.txt
           playwright install chromium --with-deps
 
-      - name: Run scrapers
+      - name: Run scrapers and push to D1
         run: |
-          python -m scrapers.runner --source job51 --pages ${Pages}
+          python -m scrapers.runner --source job51 --pages ${Pages} --push-d1
         env:
           Pages: ${{ github.event.inputs.pages_per_city || '5' }}
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./web
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: scrape
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          CF_API_URL: ${{ vars.CF_API_URL }}
+          CF_IMPORT_SECRET: ${{ secrets.CF_IMPORT_SECRET }}

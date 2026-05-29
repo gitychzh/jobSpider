@@ -4,4 +4,5 @@ venv/
 *.log
 .env
 data/
-!web/data/
+.wrangler/
+node_modules/
