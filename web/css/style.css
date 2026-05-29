@@ -1,0 +1,188 @@
+:root {
+    --primary: #1677ff;
+    --primary-dark: #0958d9;
+    --bg: #f0f2f5;
+    --card-bg: #ffffff;
+    --text: #1d2129;
+    --text-light: #4e5969;
+    --text-muted: #86909c;
+    --border: #e5e6eb;
+    --salary: #e74c3c;
+    --tag-bg: #f2f3f5;
+    --tag-text: #4e5969;
+
+    /* 平台色 */
+    --color-51job: #1677ff;
+    --color-zhilian: #f5222d;
+    --color-boss: #00b38a;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+/* ─── Header ─────────────────────────── */
+.header {
+    background: linear-gradient(135deg, var(--color-51job) 0%, #4096ff 100%);
+    color: white; padding: 24px 20px; text-align: center;
+}
+.header h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+.header .subtitle { font-size: 13px; opacity: 0.85; margin-bottom: 12px; }
+.stats-row {
+    display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;
+}
+.stat-card {
+    background: rgba(255,255,255,0.18); padding: 6px 16px;
+    border-radius: 8px; font-size: 13px;
+}
+.stat-card .num { font-weight: 600; }
+.last-update { font-size: 12px; opacity: 0.7; margin-top: 10px; }
+
+/* ─── Tabs ──────────────────────────── */
+.tabs {
+    display: flex; background: white; padding: 0 12px;
+    border-bottom: 1px solid var(--border); gap: 0;
+}
+.tab-btn {
+    padding: 10px 20px; border: none; background: none;
+    cursor: pointer; font-size: 14px; font-weight: 500;
+    color: var(--text-muted); position: relative;
+    transition: color 0.2s;
+}
+.tab-btn:hover { color: var(--text-light); }
+.tab-btn.active { color: var(--primary); }
+.tab-btn.active::after {
+    content: ''; position: absolute; bottom: 0; left: 12px; right: 12px;
+    height: 2px; background: var(--primary); border-radius: 1px;
+}
+.tab-btn.disabled {
+    color: var(--text-muted); cursor: default; opacity: 0.5;
+}
+.tab-btn.disabled::after { display: none; }
+.tab-badge {
+    font-size: 11px; background: var(--tag-bg); color: var(--text-muted);
+    padding: 1px 6px; border-radius: 4px; margin-left: 4px;
+}
+
+/* ─── Controls ──────────────────────── */
+.controls {
+    padding: 12px 16px; background: white; margin: 10px;
+    border-radius: 10px; display: flex; gap: 10px;
+    align-items: center; flex-wrap: wrap;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.controls label { font-size: 13px; color: var(--text-light); white-space: nowrap; }
+.btn {
+    padding: 7px 16px; border: none; border-radius: 6px;
+    cursor: pointer; font-size: 13px; white-space: nowrap;
+    transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-light { background: var(--tag-bg); color: var(--text-light); }
+.btn-light:hover { background: var(--border); }
+select, input[type="text"] {
+    padding: 7px 12px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 13px; outline: none;
+    transition: border-color 0.2s;
+}
+select:focus, input[type="text"]:focus { border-color: var(--primary); }
+
+/* ─── Job Cards ─────────────────────── */
+.jobs-list { padding: 10px 12px; }
+.job-card {
+    background: var(--card-bg); margin-bottom: 8px; padding: 14px 16px;
+    border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: box-shadow 0.2s, transform 0.1s;
+}
+.job-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transform: translateY(-1px);
+}
+.job-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px; gap: 8px;
+}
+.job-title {
+    font-size: 15px; font-weight: 600; flex: 1;
+}
+.job-title a { color: var(--text); text-decoration: none; }
+.job-title a:hover { color: var(--primary); }
+.source-tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px;
+    white-space: nowrap;
+}
+.source-tag.job51 { background: #e6f4ff; color: var(--color-51job); }
+.source-tag.zhilian { background: #fff1f0; color: var(--color-zhilian); }
+.source-tag.boss { background: #e6fffb; color: var(--color-boss); }
+
+.job-company {
+    color: var(--text-light); font-size: 13px; margin-bottom: 8px;
+}
+.job-meta {
+    display: flex; gap: 8px; font-size: 12px; color: var(--text-muted);
+    flex-wrap: wrap;
+}
+.job-salary { color: var(--salary); font-weight: 600; }
+.job-city-tag {
+    background: var(--tag-bg); color: var(--tag-text);
+    padding: 1px 6px; border-radius: 3px; font-size: 11px;
+}
+
+/* ─── Pagination ────────────────────── */
+.pagination {
+    text-align: center; padding: 16px; display: flex;
+    justify-content: center; gap: 4px;
+}
+.page-btn {
+    min-width: 36px; height: 32px; border: 1px solid var(--border);
+    border-radius: 6px; background: white; cursor: pointer;
+    font-size: 13px; color: var(--text-light); transition: all 0.15s;
+}
+.page-btn:hover { border-color: var(--primary); color: var(--primary); }
+.page-btn.active {
+    background: var(--primary); color: white; border-color: var(--primary);
+}
+.page-btn.disabled { opacity: 0.4; cursor: default; }
+
+/* ─── Loading / Empty ───────────────── */
+.loading-box {
+    text-align: center; padding: 40px; color: var(--text-muted);
+}
+.spinner {
+    display: inline-block; width: 24px; height: 24px;
+    border: 3px solid var(--border); border-radius: 50%;
+    border-top-color: var(--primary);
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty-box { text-align: center; padding: 40px; color: var(--text-muted); }
+.empty-box .icon { font-size: 32px; margin-bottom: 8px; }
+.empty-box .msg { font-size: 14px; }
+
+/* ─── Coming Soon ────────────────────── */
+.coming-soon {
+    text-align: center; padding: 60px 20px;
+}
+.coming-soon .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.6; }
+.coming-soon .title { font-size: 18px; color: var(--text); margin-bottom: 8px; }
+.coming-soon .desc { font-size: 14px; color: var(--text-muted); }
+
+/* ─── Responsive ────────────────────── */
+@media (max-width: 600px) {
+    .header h1 { font-size: 18px; }
+    .header { padding: 16px 12px; }
+    .controls { flex-direction: column; align-items: stretch; padding: 10px; }
+    .controls .btn { width: 100%; justify-content: center; }
+    .controls input { width: 100%; }
+    .tabs { padding: 0 8px; }
+    .tab-btn { padding: 8px 12px; font-size: 13px; }
+    .job-card { padding: 10px 12px; }
+    .job-title { font-size: 14px; }
+    .job-meta { font-size: 11px; gap: 6px; }
+}

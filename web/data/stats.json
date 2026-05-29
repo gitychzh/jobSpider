@@ -1,0 +1,24 @@
+{
+  "last_update": "2026-05-28 20:07:09",
+  "total_jobs": 491,
+  "scrapers": {
+    "job51": {
+      "source": "job51",
+      "display_name": "51job",
+      "total_jobs": 491,
+      "unique_companies": 313,
+      "by_city": {
+        "苏州": 94,
+        "昆山": 99,
+        "常熟": 100,
+        "太仓": 98,
+        "宿迁": 100
+      }
+    }
+  },
+  "available_sources": [
+    "job51",
+    "zhilian",
+    "boss"
+  ]
+}
