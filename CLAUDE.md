@@ -4,78 +4,77 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-- Run 51job scraper: `python3 -m scrapers.runner --source job51`
-- Run all scrapers: `python3 -m scrapers.runner`
-- Control page count: `python3 -m scrapers.runner --source job51 --pages 10`
-- Local preview frontend: `cd web && python3 -m http.server 8081` → visit http://localhost:8081
-- Install dependencies: `pip3 install -r requirements.txt && playwright install chromium --with-deps`
+- Run 51job scraper locally: `python -m scrapers.runner --source job51`
+- Run scraper and push to D1: `python -m scrapers.runner --source job51 --push-d1`
+- Control page count: `python -m scrapers.runner --source job51 --pages 10`
+- Local preview frontend: `cd web && python -m http.server 8081` → visit http://localhost:8081
+- Install dependencies: `pip install -r requirements.txt && playwright install chromium --with-deps`
+- Deploy Worker API: `cd worker && CLOUDFLARE_API_TOKEN=<token> wrangler deploy`
+- Deploy frontend to Pages: `cd web && CLOUDFLARE_API_TOKEN=<token> wrangler pages deploy . --project-name=jobspider --branch=main`
 
-## Deployment
+## Deployment Architecture (Cloudflare)
 
-This project deploys via **GitHub Pages** using a two-branch strategy:
-- `cc2` (or default branch): source code (scrapers + web source)
-- `gh-pages`: deployed static site (only `web/` content at root)
+This project uses **Cloudflare free-tier services** instead of GitHub Pages:
 
-**Deploying after frontend changes**: checkout `gh-pages`, copy updated files from `web/` to branch root, commit & push:
-```
-git checkout gh-pages
-rm js/app.js js/render.js css/style.css index.html
-git show cc2:web/index.html > index.html
-mkdir -p css js data
-git show cc2:web/css/style.css > css/style.css
-git show cc2:web/js/app.js > js/app.js
-git show cc2:web/js/render.js > js/render.js
-git add -A && git commit -m "update" && git push
-git checkout cc2
-```
+- **Cloudflare Pages** (`jobspider.pages.dev`): hosts the static frontend (`web/` content)
+- **Cloudflare Worker** (`jobspider-api`): API that reads/writes D1, serves job data to frontend
+  - Worker URL: `https://jobspider-api.93921526.workers.dev`
+  - Routes: `/api/jobs`, `/api/stats`, `/api/sources`, `/api/cities`, `/api/import`, `/api/cleanup`
+- **Cloudflare D1** (`jobSpider-db`, UUID: `9167c8e5-d910-4bd7-bba4-a2bea611cd4f`): SQLite database storing all job data
+  - Tables: `jobs` (primary data), `scrape_runs` (history log)
+  - Free tier: 5M rows read/day, 100K rows written/day, 5GB storage
+- **GitHub Actions** (`scrape.yml`): daily scraper runs, pushes results to D1 via `/api/import`
 
-**Deploying after scraper run (data update)**: same process but also copy `web/data/*.json` files.
+Frontend fetches data from the Worker API, not from static JSON files. The `API_BASE` constant in `web/js/app.js` points to the Worker URL.
 
-**GitHub Actions** (`scrape.yml`): runs scraper daily at UTC 02:00 and deploys via official `deploy-pages@v4` action. Requires GitHub Pages source set to "GitHub Actions" in Settings > Pages.
+**Import API authentication**: `/api/import` requires `X-Import-Secret` header. Secret is `jobSpider2024secret` (set in `worker/wrangler.toml` `[vars]`). GitHub Actions uses `CF_IMPORT_SECRET` env var.
 
 ## Architecture
 
-This project uses a **static-site architecture** for GitHub Pages:
-- Scrapers output JSON to `web/data/` (no database)
-- Frontend is pure HTML/CSS/JS SPA that fetches JSON — no backend server
-- Data flow: scraper → JSON files → gh-pages branch → GitHub Pages CDN
+**Data flow**: scraper → `/api/import` → D1 → `/api/jobs` → frontend SPA
 
 **Scraper framework** (`scrapers/`):
-- `base.py`: `BaseScraper` abstract class. Subclasses must implement `name`, `display_name`, `scrape()` → `List[JobDict]`. Provides `save_json()` and `generate_stats()`.
-- `runner.py`: CLI entrypoint, orchestrates all scrapers, writes JSON output to `web/data/`
+- `base.py`: `BaseScraper` abstract class. Subclasses implement `name`, `display_name`, `scrape()`. Provides `save_json()` (local backup), `save_to_d1()` (push to D1 via API), `generate_stats()`.
+- `runner.py`: CLI entrypoint, orchestrates scrapers. `--push-d1` flag sends data to Worker API.
 - Each platform is a sub-package inheriting `BaseScraper`
 - JobDict fields: `job_id, job_name, company_name, salary, work_area, work_year, education, issue_date, confirm_date, update_time, job_url, city, scrape_date, source`
 
 **51job scraper** (`scrapers/job51/`):
-- **Critical**: does NOT use `requests` — the 51job API has Alibaba Cloud WAF that blocks plain HTTP requests
-- Uses Playwright to open one search page (bypass WAF), then calls the API via `page.evaluate(JS_FETCH_API)` inside the browser context
-- Strategy: visit search page once → WAF passes → all subsequent API calls via JS fetch in same browser page
-- `browser.py`: manages Playwright instance lifecycle (`ensure_browser`, `close_browser`)
-- `config.py`: city codes, API base URL, `ApiParams` dataclass for building query params
+- Uses Playwright to bypass Alibaba Cloud WAF, then calls API via `page.evaluate(JS_FETCH_API)` inside browser context
+- Single browser page for all cities to avoid WAF re-verification
+
+**Worker API** (`worker/api/index.js`):
+- Reads from D1 with pagination, filtering, sorting
+- `/api/import` endpoint for external scraper to push data (auth: X-Import-Secret header)
+- `/api/cleanup` endpoint to remove old data (keep_days parameter)
+- CORS enabled for cross-origin access from Pages
 
 **Frontend** (`web/`):
 - Pure SPA, no build step, no framework
-- `app.js`: data loading, city filter, sort (issue_date/confirm_date/update_time, desc/asc), pagination
-- `render.js`: job cards, stats panel, pagination, source tags, coming-soon placeholder
-- Sort and city filter are client-side against cached JSON data
-- `updateCityFilter()` must be called AFTER data loads into cache — not before
+- `app.js`: fetches from Worker API, handles search/filter/pagination via query params
+- `render.js`: job cards, stats panel, pagination, source tags
 
 **Adding a new platform scraper**:
 1. Create `scrapers/<platform>/` with class inheriting `BaseScraper`
 2. Register in `runner.py`'s `get_available_scrapers()`
-3. Create `web/data/<platform>.json` placeholder
-4. Add to `AVAILABLE_SOURCES` in `app.js` and add a tab button in `index.html`
+3. Add to `AVAILABLE_SOURCES` in `app.js` and add tab button in `index.html`
+
+## Cloudflare Account Info
+
+- Account ID: `fcd03f4fb32acc1f7073a1fd13645fe6`
+- D1 database: `jobSpider-db` / `9167c8e5-d910-4bd7-bba4-a2bea611cd4f`
+- Pages project: `jobspider` → `jobspider.pages.dev`
+- Worker: `jobspider-api` → `jobspider-api.93921526.workers.dev`
 
 ## Key Design Decisions
 
-- No SQLite/database — data lives in JSON files for static-site compatibility
-- 51job API bypasses WAF by using Playwright JS fetch (not Python requests)
-- Single browser page for all cities — avoids WAF re-verification per city
-- GitHub Pages CDN cache: `max-age=600` (10 min), data updates may take ~10 min to appear
+- D1 replaces static JSON files — enables real-time data, filtering/sorting on server side, no CDN stale cache issues
+- 51job WAF bypass still requires Playwright (Python), so scraper runs outside CF Workers
+- GitHub Actions remains the cron trigger since CF Workers Cron can't run Playwright
+- Local JSON files kept as backup (`save_json()` still runs)
 - Remote uses SSH on port 443 (`ssh.github.com`) since port 22 is blocked
 
 ## Common Issues
 
-- **WAF blocking**: if scraper returns 0 jobs, WAF may have blocked the browser. Try re-running; Playwright stealth mode helps but is not guaranteed
-- **CDN stale data**: after pushing to gh-pages, data may show old values for ~10 minutes due to CDN cache
-- **City dropdown empty**: `updateCityFilter` must run after `loadSourceData` completes, not before
+- **WAF blocking**: if scraper returns 0 jobs, WAF may have blocked the browser. Re-run; Playwright stealth helps but isn't guaranteed
+- **API_BASE mismatch**: if Worker URL changes, update `API_BASE` in `web/js/app.js` and redeploy Pages
