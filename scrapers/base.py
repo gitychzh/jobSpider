@@ -15,11 +15,13 @@ import json
 import os
 import urllib.request
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_DIR, 'web', 'data')
+
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 # Cloudflare D1 API endpoint (set via env CF_API_URL or default)
 CF_API_URL = os.environ.get(
@@ -53,7 +55,7 @@ class BaseScraper(ABC):
         """
         os.makedirs(DATA_DIR, exist_ok=True)
         path = os.path.join(DATA_DIR, f'{self.name}.json')
-        now = datetime.now(timezone.utc)
+        now = datetime.now(BEIJING_TZ)
         output = {
             'source': self.name,
             'display_name': self.display_name,

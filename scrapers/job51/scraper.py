@@ -5,7 +5,7 @@
 """
 import time
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List
 
 from scrapers.base import BaseScraper
@@ -45,9 +45,9 @@ class Job51Scraper(BaseScraper):
     def scrape(self, pages_per_city: int = DEFAULT_PAGES_PER_CITY) -> List[Dict]:
         """爬取所有城市数据"""
         start = time.time()
-        now_utc = datetime.now(timezone.utc)
+        now_bj = datetime.now(timezone(timedelta(hours=8)))
         print(f"\n{'='*55}")
-        print(f"51job 多城市爬虫 {now_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        print(f"51job 多城市爬虫 {now_bj.strftime('%Y-%m-%d %H:%M:%S')} 北京时间")
         print(f"   {list(CITIES.keys())} | 各{pages_per_city}页 | 近1个月")
         print(f"{'='*55}")
 
@@ -131,7 +131,7 @@ class Job51Scraper(BaseScraper):
                 print(f"空数据")
                 break
 
-            now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+            now = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
             added = 0
             for j in job_list:
                 jid = str(j.get('jobId', ''))

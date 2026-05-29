@@ -12,11 +12,12 @@ import os
 import sys
 import time
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from scrapers.base import DATA_DIR, CF_API_URL
 
 CF_IMPORT_SECRET = os.environ.get('CF_IMPORT_SECRET', 'jobSpider2024secret')
+BEIJING_TZ = timezone(timedelta(hours=8))
 
 
 def get_available_scrapers():
@@ -67,7 +68,7 @@ def run_scrapers(source=None, pages_per_city=5, push_d1=False):
     all_stats = {}
     total_jobs = 0
     start = time.time()
-    start_time_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+    start_time_str = datetime.now(BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
 
     for name in targets:
         scraper = all_scrapers[name]
@@ -140,7 +141,7 @@ def run_scrapers(source=None, pages_per_city=5, push_d1=False):
                     pass
 
     # Save local stats
-    now = datetime.now(timezone.utc)
+    now = datetime.now(BEIJING_TZ)
     combined_stats = {
         'last_update': now.strftime('%Y-%m-%d %H:%M:%S'),
         'total_jobs': total_jobs,

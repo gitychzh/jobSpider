@@ -18,7 +18,7 @@ function renderJobCard(job) {
     const workArea = job.work_area || '';
     const workYear = job.work_year || '经验不限';
     const education = job.education || '学历不限';
-    const issueDate = (job.issue_date || '').slice(0, 10);
+    const issueDate = (job.issue_date || '').slice(0, 10);  // Already in Beijing time
 
     return `
     <div class="job-card">

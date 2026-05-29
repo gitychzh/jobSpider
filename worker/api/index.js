@@ -1,15 +1,9 @@
 /**
  * jobSpider API Worker — reads/writes D1, serves JSON to frontend
- * Routes:
- *   GET /api/jobs?source=job51&page=1&city=苏州&keyword=工程师&sortField=issue_date&sortOrder=desc
- *   GET /api/stats?source=job51
- *   GET /api/sources
- *   GET /api/cities?source=job51
- *   POST /api/import  (auth required, for external scraper to push data)
+ * All timestamps in DB are Beijing time (UTC+8), returned as-is.
  */
 
 const PER_PAGE = 50;
-
 const VALID_SOURCES = ['job51', 'zhilian', 'boss'];
 
 export default {
@@ -17,7 +11,6 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
@@ -49,7 +42,6 @@ async function handleImport(request, env) {
   const { action, source, jobs } = body;
 
   if (action === 'insert_jobs' && jobs && jobs.length) {
-    // Upsert jobs into D1
     const stmts = [];
     for (const j of jobs) {
       stmts.push(
@@ -63,7 +55,6 @@ async function handleImport(request, env) {
       );
     }
 
-    // D1 batch limit: send in chunks of 100
     const batchSize = 100;
     let inserted = 0;
     for (let i = 0; i < stmts.length; i += batchSize) {
@@ -155,7 +146,7 @@ async function handleJobs(url, env) {
     page,
     per_page: PER_PAGE,
     total_pages: Math.max(1, Math.ceil(total / PER_PAGE)),
-    jobs: jobsResult.results || [],
+    jobs: (jobsResult.results || []),
   });
 }
 

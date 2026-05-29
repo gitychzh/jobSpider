@@ -2,8 +2,8 @@ name: Scrape & Push to D1
 
 on:
   schedule:
-    # 北京时间 10:00 = UTC 02:00
-    - cron: '0 2 * * *'
+    # 北京时间 8:00-20:00 每隔2小时 (UTC+0:00,2:00,4:00,6:00,8:00,10:00,12:00)
+    - cron: '0 0,2,4,6,8,10,12 * * *'
   workflow_dispatch:
     inputs:
       pages_per_city:
