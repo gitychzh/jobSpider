@@ -1,5 +1,11 @@
 /**
  * app.js — 主逻辑：数据加载、搜索、筛选、分页、平台切换
+ *
+ * 增强功能：
+ *  - 数据新鲜度指示器
+ *  - 实时搜索（debounce）
+ *  - 刷新按钮
+ *  - 信息栏提示
  */
 const PER_PAGE = 50;
 const AVAILABLE_SOURCES = ['job51', 'zhilian', 'boss'];
@@ -51,6 +57,45 @@ function updateCityFilter(source) {
     });
 }
 
+// ─── 数据新鲜度 ────────────────────────────
+function updateFreshIndicator(lastUpdateStr) {
+    const indicator = document.getElementById('freshIndicator');
+    if (!lastUpdateStr) {
+        indicator.textContent = '';
+        indicator.className = 'fresh-indicator';
+        return;
+    }
+
+    const lastUpdate = new Date(lastUpdateStr + 'Z'); // UTC
+    const now = new Date();
+    const diffMs = now - lastUpdate;
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    if (diffMin < 30) {
+        indicator.textContent = '🟢 新鲜';
+        indicator.className = 'fresh-indicator fresh';
+    } else if (diffHour < 3) {
+        indicator.textContent = `🟡 ${diffHour}小时前`;
+        indicator.className = 'fresh-indicator stale';
+    } else if (diffDay < 1) {
+        indicator.textContent = `🟡 ${diffHour}小时前`;
+        indicator.className = 'fresh-indicator stale';
+    } else {
+        indicator.textContent = `🔴 ${diffDay}天前`;
+        indicator.className = 'fresh-indicator old';
+    }
+}
+
+// ─── 信息栏 ────────────────────────────
+function showInfo(message) {
+    const bar = document.getElementById('infoBar');
+    bar.textContent = message;
+    bar.className = 'info-bar visible';
+    setTimeout(() => { bar.className = 'info-bar'; }, 3000);
+}
+
 // ─── 数据加载 ────────────────────────────
 async function loadSourceData(source) {
     if (allJobsCache[source]) return allJobsCache[source];
@@ -87,8 +132,10 @@ async function loadStats() {
                 by_city: scraperStats.by_city || {},
                 last_update: stats.last_update || '',
             });
+            updateFreshIndicator(stats.last_update);
         } else {
             renderStats({ total_jobs: 0, unique_companies: 0, by_city: {}, last_update: stats.last_update || '' });
+            updateFreshIndicator(stats.last_update);
         }
     } catch (e) {
         // 忽略
@@ -117,7 +164,8 @@ async function loadJobs(page) {
         const kw = currentKeyword.toLowerCase();
         filtered = filtered.filter(j =>
             (j.job_name && j.job_name.toLowerCase().includes(kw)) ||
-            (j.company_name && j.company_name.toLowerCase().includes(kw))
+            (j.company_name && j.company_name.toLowerCase().includes(kw)) ||
+            (j.work_area && j.work_area.toLowerCase().includes(kw))
         );
     }
 
@@ -136,6 +184,13 @@ async function loadJobs(page) {
     const start = (page - 1) * PER_PAGE;
     const pageData = filtered.slice(start, start + PER_PAGE);
 
+    // 更新信息栏
+    if (currentKeyword) {
+        showInfo(`搜索「${currentKeyword}」找到 ${total} 条`);
+    } else if (currentCity) {
+        showInfo(`${currentCity} 共 ${total} 条`);
+    }
+
     renderJobList(pageData, currentKeyword);
     renderPagination(page, totalPages);
     updateCityFilter(currentSource);
@@ -150,7 +205,25 @@ function filterJobs() {
     loadJobs(1);
 }
 
-// ─── 初始化 ────────────────────────────
+// ─── 刷新数据 ────────────────────────────
+async function refreshData() {
+    // 清除缓存
+    allJobsCache = {};
+    showInfo('正在刷新数据...');
+    await loadJobs(1);
+    showInfo('数据已刷新');
+}
+
+// ─── Debounce搜索 ────────────────────────────
+let searchTimer = null;
+function debounceSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+        loadJobs(1);
+    }, 300);
+}
+
+// ─── 初始��� ────────────────────────────
 async function init() {
     // 加载统计数据确定哪些平台可用
     let availableSet = new Set(['job51']);
@@ -183,10 +256,12 @@ async function init() {
     // 默认加载51job
     switchSource('job51');
 
-    // 搜索回车触发
-    document.getElementById('searchBox').addEventListener('keypress', e => {
+    // 搜索回车触发 + 实时搜索
+    const searchBox = document.getElementById('searchBox');
+    searchBox.addEventListener('keypress', e => {
         if (e.key === 'Enter') filterJobs();
     });
+    searchBox.addEventListener('input', debounceSearch);
 }
 
 document.addEventListener('DOMContentLoaded', init);

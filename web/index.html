@@ -5,18 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>招聘信息聚合 - jobSpider</title>
     <link rel="stylesheet" href="css/style.css">
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+    <!-- Open Graph -->
+    <meta property="og:title" content="招聘信息聚合 - jobSpider">
+    <meta property="og:description" content="多平台招聘数据一览 - 51job·智联·Boss">
+    <meta property="og:type" content="website">
+    <meta name="description" content="多平台招聘数据聚合，覆盖江苏+上海17城，实时更新">
 </head>
 <body>
 
 <div class="header">
-    <h1>招聘信息聚合</h1>
-    <div class="subtitle">多平台招聘数据一览</div>
+    <h1>🔍 招聘信息聚合</h1>
+    <div class="subtitle">多平台招聘数据一览 · 江苏上海17城</div>
     <div class="stats-row">
         <div class="stat-card">职位 <span class="num" id="totalJobs">-</span> 条</div>
         <div class="stat-card">公司 <span class="num" id="totalCompanies">-</span> 家</div>
         <div class="stat-card" id="cityStats"></div>
     </div>
-    <div class="last-update">更新时间: <span id="lastUpdate">-</span></div>
+    <div class="last-update">更新时间: <span id="lastUpdate">-</span>
+        <span id="freshIndicator" class="fresh-indicator"></span>
+    </div>
 </div>
 
 <div class="tabs">
@@ -48,13 +57,21 @@
     </select>
     <input type="text" id="searchBox" placeholder="搜索职位/公司..." style="flex:1;min-width:150px;">
     <button class="btn btn-light" onclick="filterJobs()">搜索</button>
+    <button class="btn btn-primary" onclick="refreshData()" title="刷新数据">↻</button>
 </div>
+
+<div class="info-bar" id="infoBar"></div>
 
 <div class="jobs-list" id="jobsList">
     <div class="loading-box"><span class="spinner"></span><br>加载中...</div>
 </div>
 
 <div class="pagination" id="pagination"></div>
+
+<footer class="footer">
+    <p>jobSpider · 数据来自51job等公开招聘平台 · 自动更新</p>
+    <p>仅展示近1个月发布的职位 · 数据仅供参考</p>
+</footer>
 
 <script src="js/render.js"></script>
 <script src="js/app.js"></script>

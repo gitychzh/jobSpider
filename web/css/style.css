@@ -8,6 +8,7 @@
     --text-muted: #86909c;
     --border: #e5e6eb;
     --salary: #e74c3c;
+    --salary-negotiable: #86909c;
     --tag-bg: #f2f3f5;
     --tag-text: #4e5969;
 
@@ -41,6 +42,15 @@ body {
 }
 .stat-card .num { font-weight: 600; }
 .last-update { font-size: 12px; opacity: 0.7; margin-top: 10px; }
+
+/* ─── Fresh Indicator ──────────────── */
+.fresh-indicator {
+    font-size: 12px;
+    margin-left: 6px;
+}
+.fresh-indicator.fresh { color: #4ade80; }
+.fresh-indicator.stale { color: #fbbf24; }
+.fresh-indicator.old { color: #f87171; }
 
 /* ─── Tabs ──────────────────────────── */
 .tabs {
@@ -92,6 +102,17 @@ select, input[type="text"] {
 }
 select:focus, input[type="text"]:focus { border-color: var(--primary); }
 
+/* ─── Info Bar ──────────────────────── */
+.info-bar {
+    padding: 6px 16px; font-size: 13px; color: var(--text-light);
+    background: transparent; text-align: center;
+    transition: all 0.3s; opacity: 0; max-height: 0;
+}
+.info-bar.visible {
+    background: #e6f4ff; opacity: 1; max-height: 30px;
+    margin: 6px 10px; border-radius: 6px;
+}
+
 /* ─── Job Cards ─────────────────────── */
 .jobs-list { padding: 10px 12px; }
 .job-card {
@@ -128,9 +149,19 @@ select:focus, input[type="text"]:focus { border-color: var(--primary); }
     flex-wrap: wrap;
 }
 .job-salary { color: var(--salary); font-weight: 600; }
+.salary-negotiable { color: var(--salary-negotiable); font-weight: normal; }
 .job-city-tag {
     background: var(--tag-bg); color: var(--tag-text);
     padding: 1px 6px; border-radius: 3px; font-size: 11px;
+}
+.meta-tag {
+    font-size: 11px; color: var(--text-muted);
+}
+.date-tag {
+    color: var(--text-light);
+}
+.confirm-tag {
+    color: #00b38a;
 }
 
 /* ─── Pagination ────────────────────── */
@@ -148,6 +179,10 @@ select:focus, input[type="text"]:focus { border-color: var(--primary); }
     background: var(--primary); color: white; border-color: var(--primary);
 }
 .page-btn.disabled { opacity: 0.4; cursor: default; }
+.page-info {
+    font-size: 12px; color: var(--text-muted); padding: 4px 8px;
+    display: flex; align-items: center;
+}
 
 /* ─── Loading / Empty ───────────────── */
 .loading-box {
@@ -164,6 +199,7 @@ select:focus, input[type="text"]:focus { border-color: var(--primary); }
 .empty-box { text-align: center; padding: 40px; color: var(--text-muted); }
 .empty-box .icon { font-size: 32px; margin-bottom: 8px; }
 .empty-box .msg { font-size: 14px; }
+.empty-box .hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
 /* ─── Coming Soon ────────────────────── */
 .coming-soon {
@@ -172,6 +208,13 @@ select:focus, input[type="text"]:focus { border-color: var(--primary); }
 .coming-soon .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.6; }
 .coming-soon .title { font-size: 18px; color: var(--text); margin-bottom: 8px; }
 .coming-soon .desc { font-size: 14px; color: var(--text-muted); }
+
+/* ─── Footer ──────────────────────────── */
+.footer {
+    text-align: center; padding: 16px; font-size: 12px;
+    color: var(--text-muted); border-top: 1px solid var(--border);
+    margin-top: 10px;
+}
 
 /* ─── Responsive ────────────────────── */
 @media (max-width: 600px) {
@@ -185,4 +228,5 @@ select:focus, input[type="text"]:focus { border-color: var(--primary); }
     .job-card { padding: 10px 12px; }
     .job-title { font-size: 14px; }
     .job-meta { font-size: 11px; gap: 6px; }
+    .footer { padding: 12px; }
 }
