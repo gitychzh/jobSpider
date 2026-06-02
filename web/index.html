@@ -33,10 +33,10 @@
         51job <span class="tab-badge">17城</span>
     </button>
     <button class="tab-btn" data-source="zhilian" onclick="switchSource('zhilian')">
-        智联招聘 <span class="tab-badge">未开放</span>
+        智联招聘 <span class="tab-badge">开发中</span>
     </button>
     <button class="tab-btn" data-source="boss" onclick="switchSource('boss')">
-        Boss直聘 <span class="tab-badge">未开放</span>
+        Boss直聘 <span class="tab-badge">开发中</span>
     </button>
 </div>
 
@@ -44,6 +44,17 @@
     <label>城市</label>
     <select id="cityFilter" onchange="loadJobs(1)">
         <option value="">全部城市</option>
+    </select>
+    <label>学历</label>
+    <select id="educationFilter" onchange="loadJobs(1)">
+        <option value="">不限</option>
+        <option value="大专">大专</option>
+        <option value="本科">本科</option>
+        <option value="硕士">硕士</option>
+        <option value="博士">博士</option>
+        <option value="中专">中专/中技</option>
+        <option value="高中">高中</option>
+        <option value="初中">初中及以下</option>
     </select>
     <label>排序</label>
     <select id="sortField" onchange="loadJobs(1)">
@@ -55,8 +66,12 @@
         <option value="desc">从新到旧</option>
         <option value="asc">从旧到新</option>
     </select>
-    <input type="text" id="searchBox" placeholder="搜索职位/公司..." style="flex:1;min-width:150px;">
+</div>
+
+<div class="controls">
+    <input type="text" id="searchBox" placeholder="搜索职位/公司/区域..." style="flex:1;min-width:200px;">
     <button class="btn btn-light" onclick="filterJobs()">搜索</button>
+    <button class="btn btn-secondary" onclick="clearFilters()">清空筛选</button>
     <button class="btn btn-primary" onclick="refreshData()" title="刷新数据">↻</button>
 </div>
 

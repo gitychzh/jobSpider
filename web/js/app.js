@@ -1,11 +1,13 @@
 /**
  * app.js — 主逻辑：数据加载、搜索、筛选、分页、平台切换
  *
- * 增强功能：
+ * 功能：
  *  - 数据新鲜度指示器
  *  - 实时搜索（debounce）
  *  - 刷新按钮
  *  - 信息栏提示
+ *  - 学历筛选
+ *  - 清空筛选
  */
 const PER_PAGE = 50;
 const AVAILABLE_SOURCES = ['job51', 'zhilian', 'boss'];
@@ -14,6 +16,7 @@ let currentSource = 'job51';
 let currentPage = 1;
 let currentKeyword = '';
 let currentCity = '';
+let currentEducation = '';
 let allJobsCache = {};
 
 // ─── 平台切换 ────────────────────────────
@@ -22,9 +25,11 @@ function switchSource(source) {
     currentPage = 1;
     currentKeyword = '';
     currentCity = '';
+    currentEducation = '';
 
     document.getElementById('searchBox').value = '';
     document.getElementById('cityFilter').value = '';
+    document.getElementById('educationFilter').value = '';
 
     // 更新tab样式
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -146,6 +151,7 @@ async function loadJobs(page) {
     currentPage = page;
     currentCity = document.getElementById('cityFilter').value;
     currentKeyword = document.getElementById('searchBox').value.trim();
+    currentEducation = document.getElementById('educationFilter').value;
 
     renderLoading();
 
@@ -157,9 +163,22 @@ async function loadJobs(page) {
 
     // 纯前端筛选
     let filtered = data.jobs;
+
+    // 城市筛选
     if (currentCity) {
         filtered = filtered.filter(j => j.city === currentCity);
     }
+
+    // 学历筛选（模糊匹配，因为51job的学历格式多样）
+    if (currentEducation) {
+        filtered = filtered.filter(j => {
+            const edu = (j.education || '').toLowerCase();
+            const target = currentEducation.toLowerCase();
+            return edu.includes(target) || edu === target;
+        });
+    }
+
+    // 关键词搜索
     if (currentKeyword) {
         const kw = currentKeyword.toLowerCase();
         filtered = filtered.filter(j =>
@@ -185,10 +204,12 @@ async function loadJobs(page) {
     const pageData = filtered.slice(start, start + PER_PAGE);
 
     // 更新信息栏
-    if (currentKeyword) {
-        showInfo(`搜索「${currentKeyword}」找到 ${total} 条`);
-    } else if (currentCity) {
-        showInfo(`${currentCity} 共 ${total} 条`);
+    let infoParts = [];
+    if (currentKeyword) infoParts.push(`搜索「${currentKeyword}」`);
+    if (currentCity) infoParts.push(currentCity);
+    if (currentEducation) infoParts.push(currentEducation + '及以上');
+    if (infoParts.length > 0) {
+        showInfo(`${infoParts.join(' · ')} → ${total} 条`);
     }
 
     renderJobList(pageData, currentKeyword);
@@ -202,6 +223,17 @@ function loadPage(page) {
 }
 
 function filterJobs() {
+    loadJobs(1);
+}
+
+// ─── 清空筛选 ────────────────────────────
+function clearFilters() {
+    document.getElementById('searchBox').value = '';
+    document.getElementById('cityFilter').value = '';
+    document.getElementById('educationFilter').value = '';
+    currentKeyword = '';
+    currentCity = '';
+    currentEducation = '';
     loadJobs(1);
 }
 
@@ -223,7 +255,7 @@ function debounceSearch() {
     }, 300);
 }
 
-// ─── 初始��� ────────────────────────────
+// ─── 初始化 ────────────────────────────
 async function init() {
     // 加载统计数据确定哪些平台可用
     let availableSet = new Set(['job51']);

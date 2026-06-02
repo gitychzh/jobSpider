@@ -95,6 +95,8 @@ body {
 .btn-primary:hover { background: var(--primary-dark); }
 .btn-light { background: var(--tag-bg); color: var(--text-light); }
 .btn-light:hover { background: var(--border); }
+.btn-secondary { background: #fff; color: var(--text-light); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--tag-bg); }
 select, input[type="text"] {
     padding: 7px 12px; border: 1px solid var(--border);
     border-radius: 6px; font-size: 13px; outline: none;
