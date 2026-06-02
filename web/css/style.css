@@ -184,7 +184,7 @@ select:focus, input[type="text"]:focus { border-color: var(--primary); }
     display: flex; align-items: center;
 }
 
-/* ─── Loading / Empty ───────────────── */
+/* ─── Loading / Skeleton ──────────────── */
 .loading-box {
     text-align: center; padding: 40px; color: var(--text-muted);
 }
@@ -196,6 +196,28 @@ select:focus, input[type="text"]:focus { border-color: var(--primary); }
     margin-bottom: 8px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Skeleton loading cards */
+.skeleton-card {
+    background: var(--card-bg); margin-bottom: 8px; padding: 14px 16px;
+    border-radius: 10px;
+}
+.skeleton-line {
+    height: 14px; margin-bottom: 8px; border-radius: 4px;
+    background: linear-gradient(90deg, var(--tag-bg) 25%, var(--border) 50%, var(--tag-bg) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+.skeleton-line.title { height: 18px; width: 60%; }
+.skeleton-line.company { width: 40%; }
+.skeleton-line.meta { height: 12px; width: 80%; }
+.skeleton-line.short { height: 12px; width: 30%; }
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ─── Empty ───────────────── */
 .empty-box { text-align: center; padding: 40px; color: var(--text-muted); }
 .empty-box .icon { font-size: 32px; margin-bottom: 8px; }
 .empty-box .msg { font-size: 14px; }

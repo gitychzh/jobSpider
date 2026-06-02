@@ -1,0 +1,30 @@
+# Cloudflare Pages _headers file
+# https://developers.cloudflare.com/pages/configuration/serving-pages/#headers
+
+# JSON data files - short cache for freshness
+/data/*.json
+  Cache-Control: public, max-age=300, stale-while-revalidate=600
+  Access-Control-Allow-Origin: *
+  Content-Type: application/json
+
+# Static assets - long cache
+/css/*.css
+  Cache-Control: public, max-age=86400, immutable
+
+/js/*.js
+  Cache-Control: public, max-age=86400, immutable
+
+# HTML - short cache for updates
+/*.html
+  Cache-Control: public, max-age=60, stale-while-revalidate=300
+
+# Index page
+/index.html
+  Cache-Control: public, max-age=60, stale-while-revalidate=300
+  X-Content-Type-Options: nosniff
+
+# Security headers for all pages
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin

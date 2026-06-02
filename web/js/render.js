@@ -161,7 +161,18 @@ function renderComingSoon(name) {
 }
 
 function renderLoading() {
-    document.getElementById('jobsList').innerHTML = `
-        <div class="loading-box"><span class="spinner"></span><br>加载中...</div>`;
+    // Show skeleton cards for better perceived performance
+    const skeletonCount = 5;
+    let html = '';
+    for (let i = 0; i < skeletonCount; i++) {
+        html += `
+        <div class="skeleton-card">
+            <div class="skeleton-line title"></div>
+            <div class="skeleton-line company"></div>
+            <div class="skeleton-line meta"></div>
+            <div class="skeleton-line short"></div>
+        </div>`;
+    }
+    document.getElementById('jobsList').innerHTML = html;
     document.getElementById('pagination').innerHTML = '';
 }
