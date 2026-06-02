@@ -2,13 +2,25 @@
 from dataclasses import dataclass
 from typing import Dict
 
-# ─── 城市配置 ───────────────────────────────────
+# ─── 城市配置 — 扩大到江苏+长三角主要城市 ───────────
 CITIES: Dict[str, str] = {
     "苏州": "070300",
     "昆山": "070600",
     "常熟": "070700",
     "太仓": "071600",
     "宿迁": "072000",
+    "南京": "070100",
+    "无锡": "070200",
+    "常州": "070400",
+    "南通": "070500",
+    "扬州": "071400",
+    "镇江": "071100",
+    "徐州": "070800",
+    "盐城": "071500",
+    "淮安": "070900",
+    "连云港": "071000",
+    "泰州": "071200",
+    "上海": "020000",
 }
 
 # ─── API 参数 ────────────────────────────────────
@@ -21,8 +33,8 @@ class ApiParams:
     api_key: str = "51job"
     search_type: str = "2"
     keyword_type: str = "2"
-    issue_date: str = "4"
-    sort_type: str = "0"
+    issue_date: str = "4"  # 近1个月
+    sort_type: str = "0"   # 默认排序
     page_size: str = "20"
     source: str = "1"
     page_code: str = "sou|sou|soulb"

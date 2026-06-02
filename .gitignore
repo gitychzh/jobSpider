@@ -4,4 +4,4 @@ venv/
 *.log
 .env
 data/
-!web/data/
+!web/data/.wrangler/

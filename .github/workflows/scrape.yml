@@ -7,17 +7,15 @@ on:
   workflow_dispatch:
     inputs:
       pages_per_city:
-        description: '每城市爬��页数'
+        description: '每城市爬取页数'
         required: false
         default: '5'
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: "pages"
+  group: "scrape"
   cancel-in-progress: false
 
 jobs:
@@ -42,21 +40,17 @@ jobs:
         env:
           Pages: ${{ github.event.inputs.pages_per_city || '5' }}
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Commit data changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add web/data/
+          git diff --staged --quiet || git commit -m "auto: update job data"
+          git push
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
         with:
-          path: ./web
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: scrape
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: fcd03f4fb32acc1f7073a1fd13645fe6
+          command: pages deploy web/ --project-name=jobspider --branch=main

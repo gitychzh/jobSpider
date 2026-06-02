@@ -1,6 +1,11 @@
 """
 Playwright 浏览器管理模块 — 启动/复用浏览器、过WAF、取cookies
-复用浏览器实例减少资源消耗，WAF失败时支持指定城市重试
+
+优化点：
+  - 更多UA随机化
+  - stealth配置更全面
+  - 浏览器崩溃时自动重启
+  - 页面超时更合理
 """
 import time
 import random
@@ -18,21 +23,46 @@ _browser = None
 _browser_context = None
 
 USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/134.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/133.0.0.0 Safari/537.36',
+    # Chrome on Windows
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/134.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/133.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/132.0.0.0 Safari/537.36',
+    # Chrome on Mac
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/134.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/133.0.0.0 Safari/537.36',
+    # Edge on Windows
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Edg/134.0.0.0',
 ]
 
 
 def ensure_browser() -> Tuple:
-    """启动或复用 Playwright 浏览器实例（headless + stealth）"""
+    """启动或复用 Playwright 浏览器实例（headless + stealth）
+
+    如果浏览器崩溃则自动重启
+    """
     global _playwright_instance, _browser, _browser_context
-    if _browser and _browser.is_connected():
-        return _browser, _browser_context
+
+    # 检查现有浏览器是否还活着
+    if _browser:
+        try:
+            if _browser.is_connected():
+                return _browser, _browser_context
+        except Exception:
+            pass
+        # 浏览器崩溃了，清理后重建
+        print("  浏览器连接断开，正在重启...")
+        _cleanup_browser()
 
     _playwright_instance = sync_playwright().start()
     _browser = _playwright_instance.chromium.launch(
         headless=True,
-        args=['--no-sandbox', '--disable-dev-shm-usage'],
+        args=[
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-infobars',
+        ],
     )
     _browser_context = _browser.new_context(
         user_agent=random.choice(USER_AGENTS),
@@ -42,9 +72,37 @@ def ensure_browser() -> Tuple:
         },
         locale='zh-CN',
         timezone_id='Asia/Shanghai',
+        # 模拟真实浏览器环境
+        java_script_enabled=True,
+        bypass_csp=True,
+        extra_http_headers={
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        },
     )
+
+    # 应用 stealth 模式
     Stealth().apply_stealth_sync(_browser_context)
+
+    print("  浏览器启动完成")
     return _browser, _browser_context
+
+
+def _cleanup_browser():
+    """清理旧的浏览器实例"""
+    global _playwright_instance, _browser, _browser_context
+    if _browser:
+        try:
+            _browser.close()
+        except Exception:
+            pass
+    if _playwright_instance:
+        try:
+            _playwright_instance.stop()
+        except Exception:
+            pass
+    _browser = None
+    _browser_context = None
+    _playwright_instance = None
 
 
 def get_cookies(city_code: Optional[str] = None) -> Optional[Dict[str, str]]:
@@ -61,6 +119,7 @@ def get_cookies(city_code: Optional[str] = None) -> Optional[Dict[str, str]]:
         page.goto(url, timeout=30000, wait_until='domcontentloaded')
         time.sleep(3)
 
+        # 多信号等待 WAF 通过
         for _ in range(15):
             cnt = page.evaluate("document.querySelectorAll('.joblist-item').length")
             if cnt >= 5:
@@ -78,17 +137,4 @@ def get_cookies(city_code: Optional[str] = None) -> Optional[Dict[str, str]]:
 
 def close_browser():
     """关闭浏览器实例"""
-    global _playwright_instance, _browser, _browser_context
-    if _browser:
-        try:
-            _browser.close()
-        except Exception:
-            pass
-    if _playwright_instance:
-        try:
-            _playwright_instance.stop()
-        except Exception:
-            pass
-    _browser = None
-    _browser_context = None
-    _playwright_instance = None
+    _cleanup_browser()
