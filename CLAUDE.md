@@ -9,36 +9,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Control page count: `python3 -m scrapers.runner --source job51 --pages 10`
 - Local preview frontend: `cd web && python3 -m http.server 8081` → visit http://localhost:8081
 - Install dependencies: `pip3 install -r requirements.txt && playwright install chromium --with-deps`
+- Deploy to Cloudflare Pages: `CLOUDFLARE_API_TOKEN=cfat_... wrangler pages deploy web/ --project-name=jobspider --branch=main`
 
 ## Deployment
 
-This project deploys via **GitHub Pages** using a two-branch strategy:
-- `cc2` (or default branch): source code (scrapers + web source)
-- `gh-pages`: deployed static site (only `web/` content at root)
+This project deploys via **Cloudflare Pages** (replaced GitHub Pages):
+- URL: https://job.223722.xyz (also https://jobspider.pages.dev)
+- Cloudflare account: `fcd03f4fb32acc1f7073a1fd13645fe6`
+- Zone: `223722.xyz` (active, Cloudflare-managed DNS)
 
-**Deploying after frontend changes**: checkout `gh-pages`, copy updated files from `web/` to branch root, commit & push:
-```
-git checkout gh-pages
-rm js/app.js js/render.js css/style.css index.html
-git show cc2:web/index.html > index.html
-mkdir -p css js data
-git show cc2:web/css/style.css > css/style.css
-git show cc2:web/js/app.js > js/app.js
-git show cc2:web/js/render.js > js/render.js
-git add -A && git commit -m "update" && git push
-git checkout cc2
+**Deploying manually**:
+```bash
+# Run scraper first (optional)
+python3 -m scrapers.runner --source job51 --pages 5
+# Then deploy
+CLOUDFLARE_API_TOKEN=<token> wrangler pages deploy web/ --project-name=jobspider --branch=main
 ```
 
-**Deploying after scraper run (data update)**: same process but also copy `web/data/*.json` files.
+**GitHub Actions** (`scrape.yml`): runs scraper daily at UTC 02:00 (BJT 10:00) and:
+1. Commits updated JSON data to the repo
+2. Deploys to Cloudflare Pages via `wrangler` action
 
-**GitHub Actions** (`scrape.yml`): runs scraper daily at UTC 02:00 and deploys via official `deploy-pages@v4` action. Requires GitHub Pages source set to "GitHub Actions" in Settings > Pages.
+Requires `CLOUDFLARE_API_TOKEN` secret set in GitHub repo Settings > Secrets.
+
+**Old gh-pages branch**: no longer used for deployment, but kept for history.
 
 ## Architecture
 
-This project uses a **static-site architecture** for GitHub Pages:
+This project uses a **static-site architecture**:
 - Scrapers output JSON to `web/data/` (no database)
 - Frontend is pure HTML/CSS/JS SPA that fetches JSON — no backend server
-- Data flow: scraper → JSON files → gh-pages branch → GitHub Pages CDN
+- Data flow: scraper → JSON files → git commit → Cloudflare Pages CDN
 
 **Scraper framework** (`scrapers/`):
 - `base.py`: `BaseScraper` abstract class. Subclasses must implement `name`, `display_name`, `scrape()` → `List[JobDict]`. Provides `save_json()` and `generate_stats()`.
@@ -47,18 +48,25 @@ This project uses a **static-site architecture** for GitHub Pages:
 - JobDict fields: `job_id, job_name, company_name, salary, work_area, work_year, education, issue_date, confirm_date, update_time, job_url, city, scrape_date, source`
 
 **51job scraper** (`scrapers/job51/`):
-- **Critical**: does NOT use `requests` — the 51job API has Alibaba Cloud WAF that blocks plain HTTP requests
 - Uses Playwright to open one search page (bypass WAF), then calls the API via `page.evaluate(JS_FETCH_API)` inside the browser context
+- WAF is Alibaba Cloud — it blocks plain HTTP requests but allows browser-sourced fetch
+- **JS decryption is NOT applicable** — the API returns plain JSON; the WAF is network-layer blocking, not encryption
 - Strategy: visit search page once → WAF passes → all subsequent API calls via JS fetch in same browser page
-- `browser.py`: manages Playwright instance lifecycle (`ensure_browser`, `close_browser`)
+- Covers 17 cities: 江苏全省(13) + 上海
+- `browser.py`: manages Playwright instance lifecycle with stealth mode and auto-restart on crash
 - `config.py`: city codes, API base URL, `ApiParams` dataclass for building query params
+- Enhanced: API retry (3 attempts), WAF multi-signal detection, data validation & cleaning
+
+**Boss直聘 & 智联招聘**:
+- Both marked as "未开放" — Boss has extremely aggressive anti-bot (warlock fingerprint + browser-check JS), Playwright headless is completely blocked
+- Zhilian similarly has WAF challenges
+- Skeleton classes exist in `scrapers/boss/` and `scrapers/zhilian/`
 
 **Frontend** (`web/`):
 - Pure SPA, no build step, no framework
-- `app.js`: data loading, city filter, sort (issue_date/confirm_date/update_time, desc/asc), pagination
-- `render.js`: job cards, stats panel, pagination, source tags, coming-soon placeholder
-- Sort and city filter are client-side against cached JSON data
-- `updateCityFilter()` must be called AFTER data loads into cache — not before
+- `app.js`: data loading, city filter, sort, pagination, debounce search, refresh button, fresh indicator
+- `render.js`: job cards, stats panel, pagination, source tags, relative time display
+- `style.css`: responsive design, fresh indicator, info bar, footer
 
 **Adding a new platform scraper**:
 1. Create `scrapers/<platform>/` with class inheriting `BaseScraper`
@@ -69,13 +77,15 @@ This project uses a **static-site architecture** for GitHub Pages:
 ## Key Design Decisions
 
 - No SQLite/database — data lives in JSON files for static-site compatibility
-- 51job API bypasses WAF by using Playwright JS fetch (not Python requests)
+- 51job API bypasses WAF by using Playwright JS fetch (not Python requests) — this is the ONLY working method
 - Single browser page for all cities — avoids WAF re-verification per city
-- GitHub Pages CDN cache: `max-age=600` (10 min), data updates may take ~10 min to appear
-- Remote uses SSH on port 443 (`ssh.github.com`) since port 22 is blocked
+- Cloudflare Pages deployment (replaced GitHub Pages) — faster CDN, easier management
+- 51job covers 17 cities (江苏13城 + 上海) for comprehensive coverage
+- GitHub Actions auto-commits data changes + deploys to Cloudflare Pages
 
 ## Common Issues
 
-- **WAF blocking**: if scraper returns 0 jobs, WAF may have blocked the browser. Try re-running; Playwright stealth mode helps but is not guaranteed
-- **CDN stale data**: after pushing to gh-pages, data may show old values for ~10 minutes due to CDN cache
-- **City dropdown empty**: `updateCityFilter` must run after `loadSourceData` completes, not before
+- **WAF blocking**: if scraper returns 0 jobs, WAF may have blocked the browser. Re-run; Playwright stealth mode helps but is not guaranteed
+- **Boss直聘 blocked**: Boss uses warlock fingerprint + browser-check; Playwright headless completely blocked. Need non-headless browser or different approach
+- **Empty cities**: some cities (南京, 盐城) may return empty data — the scraper correctly handles this and skips
+- **Cloudflare Pages stale data**: deployment is near-instant, but browser cache may show old data briefly
