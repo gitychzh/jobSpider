@@ -8,8 +8,8 @@ BaseScraper 抽象基类 — 所有平台爬虫的统一接口
 
 JobDict 统一字段:
   job_id, job_name, company_name, salary, work_area,
-  work_year, education, issue_date, job_url, city,
-  scrape_date, source
+  work_year, education, issue_date, confirm_date, update_time,
+  job_url, city, scrape_date, source
 """
 import json
 import os
@@ -62,6 +62,9 @@ class BaseScraper(ABC):
         """生成统计数据"""
         cities = {}
         companies = set()
+        salary_ranges = {}
+        educations = {}
+
         for j in jobs:
             city = j.get('city', '')
             if city:
@@ -69,10 +72,28 @@ class BaseScraper(ABC):
             c = j.get('company_name', '')
             if c:
                 companies.add(c)
+
+            # 统计学历分布
+            edu = j.get('education', '')
+            if edu:
+                educations[edu] = educations.get(edu, 0) + 1
+
+            # 统计薪资范围（简单分类）
+            salary = j.get('salary', '')
+            if salary and salary != '薪资面议':
+                salary_ranges[salary] = salary_ranges.get(salary, 0) + 1
+            else:
+                salary_ranges['薪资面议'] = salary_ranges.get('薪资面议', 0) + 1
+
         return {
             'source': self.name,
             'display_name': self.display_name,
             'total_jobs': len(jobs),
             'unique_companies': len(companies),
             'by_city': cities,
+            'by_education': educations,
+            'salary_summary': {
+                '面议': salary_ranges.get('薪资面议', 0),
+                '有明确薪资': sum(v for k, v in salary_ranges.items() if k != '薪资面议'),
+            },
         }

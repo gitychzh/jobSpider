@@ -83,6 +83,7 @@ def run_scrapers(source=None, pages_per_city=5):
         'total_jobs': total_jobs,
         'scrapers': all_stats,
         'available_sources': list(all_scrapers.keys()),
+        'total_unique_companies': sum(s.get('unique_companies', 0) for s in all_stats.values()),
     }
     stats_path = os.path.join(DATA_DIR, 'stats.json')
     with open(stats_path, 'w', encoding='utf-8') as f:

@@ -1,0 +1,5 @@
+# Cloudflare Pages _redirects file
+# https://developers.cloudflare.com/pages/configuration/serving-pages/#redirects
+
+# Redirect old GitHub Pages URL patterns to new structure
+# /data/job51.json is already at correct path
