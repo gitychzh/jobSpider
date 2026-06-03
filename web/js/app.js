@@ -135,11 +135,14 @@ async function loadStats() {
                 total_jobs: scraperStats.total_jobs || 0,
                 unique_companies: scraperStats.unique_companies || 0,
                 by_city: scraperStats.by_city || {},
+                by_education: scraperStats.by_education || {},
+                salary_summary: scraperStats.salary_summary || {},
                 last_update: stats.last_update || '',
             });
+            renderStatsPanel(scraperStats);
             updateFreshIndicator(stats.last_update);
         } else {
-            renderStats({ total_jobs: 0, unique_companies: 0, by_city: {}, last_update: stats.last_update || '' });
+            renderStats({ total_jobs: 0, unique_companies: 0, by_city: {}, by_education: {}, salary_summary: {}, last_update: stats.last_update || '' });
             updateFreshIndicator(stats.last_update);
         }
     } catch (e) {
@@ -216,6 +219,21 @@ async function loadJobs(page) {
     renderPagination(page, totalPages);
     updateCityFilter(currentSource);
     loadStats();
+}
+
+// ─── 统计面板展开/折叠 ────────────────────────────
+let statsPanelVisible = false;
+function toggleStatsPanel() {
+    statsPanelVisible = !statsPanelVisible;
+    const panel = document.getElementById('statsPanel');
+    const toggle = document.getElementById('statsToggle');
+    if (statsPanelVisible) {
+        panel.classList.add('visible');
+        toggle.textContent = '▲ 收起统计';
+    } else {
+        panel.classList.remove('visible');
+        toggle.textContent = '▼ 查看详细统计';
+    }
 }
 
 function loadPage(page) {

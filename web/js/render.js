@@ -102,9 +102,70 @@ function renderStats(stats) {
 
     const cityStats = document.getElementById('cityStats');
     if (stats.by_city) {
-        const parts = Object.entries(stats.by_city).map(([c, n]) => `${c}: ${n}`);
+        // Show city stats as a bar-style visualization
+        const entries = Object.entries(stats.by_city).sort((a, b) => b[1] - a[1]);
+        const max = entries[0]?.[1] || 1;
+        let parts = entries.map(([c, n]) => `${c}: ${n}`);
         cityStats.textContent = parts.join(' | ');
     }
+}
+
+function renderStatsPanel(stats) {
+    // Render detailed stats panel below the header
+    const panel = document.getElementById('statsPanel');
+    if (!panel) return;
+
+    if (!stats || !stats.total_jobs) {
+        panel.innerHTML = '';
+        return;
+    }
+
+    const educationData = stats.by_education || {};
+    const salarySummary = stats.salary_summary || {};
+    const cityData = stats.by_city || {};
+
+    // Top 5 cities bar chart
+    const topCities = Object.entries(cityData).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const cityMax = topCities[0]?.[1] || 1;
+
+    let html = '<div class="stats-grid">';
+
+    // City distribution
+    html += '<div class="stats-section"><h3>城市分布</h3>';
+    for (const [city, count] of topCities) {
+        const pct = Math.round(count / cityMax * 100);
+        html += `<div class="bar-row">
+            <span class="bar-label">${city}</span>
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--color-51job)"></div></div>
+            <span class="bar-value">${count}</span>
+        </div>`;
+    }
+    html += '</div>';
+
+    // Education distribution
+    const eduEntries = Object.entries(educationData).sort((a, b) => b[1] - a[1]);
+    const eduMax = eduEntries[0]?.[1] || 1;
+    if (eduEntries.length > 0) {
+        html += '<div class="stats-section"><h3>学历要求</h3>';
+        for (const [edu, count] of eduEntries.slice(0, 6)) {
+            const pct = Math.round(count / eduMax * 100);
+            html += `<div class="bar-row">
+                <span class="bar-label">${edu || '不限'}</span>
+                <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:#00b38a"></div></div>
+                <span class="bar-value">${count}</span>
+            </div>`;
+        }
+        html += '</div>';
+    }
+
+    // Salary summary
+    html += '<div class="stats-section"><h3>薪资概要</h3>';
+    html += `<div class="stat-item"><span class="stat-label">明确薪资</span><span class="stat-num">${salarySummary['有明确薪资'] || 0}条</span></div>`;
+    html += `<div class="stat-item"><span class="stat-label">薪资面议</span><span class="stat-num">${salarySummary['面议'] || 0}条</span></div>`;
+    html += '</div>';
+
+    html += '</div>';
+    panel.innerHTML = html;
 }
 
 function renderPagination(page, totalPages) {
