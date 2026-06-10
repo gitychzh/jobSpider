@@ -64,15 +64,26 @@ This project uses a **static-site architecture**:
 
 **Frontend** (`web/`):
 - Pure SPA, no build step, no framework
-- `app.js`: data loading, city filter, sort, pagination, debounce search, refresh button, fresh indicator
-- `render.js`: job cards, stats panel, pagination, source tags, relative time display
-- `style.css`: responsive design, fresh indicator, info bar, footer
+- File structure: `css/style.css`, `js/app.js`, `js/render.js`, `index.html`, `404.html`
+- `app.js`: data loading, city/education/salary filter, sort, pagination, debounce search, refresh button, fresh indicator, dark mode toggle, back-to-top button
+- `render.js`: job cards (with search keyword highlighting), stats panel, pagination, source tags, relative time display
+- `style.css`: responsive design, CSS variables (light + dark themes via `[data-theme="dark"]`), fresh indicator, info bar, skeleton loading, footer
+
+**Frontend features**:
+- **Dark mode**: toggle button in header (🌙/☀️), persists via `localStorage`, auto-detects `prefers-color-scheme`, CSS variables switch via `[data-theme="dark"]`
+- **Education filter**: hierarchical "及以上" logic — `本科及以上` shows 本科+硕士+博士 using `EDU_LEVELS` mapping
+- **Salary filter**: range-based (3k以下, 3k-5k, 5k-10k, 10k-20k, 20k-50k, 50k以上, 薪资面议), parses 51job salary strings (千/月, 万/月, 元/天)
+- **Search highlighting**: matched keywords in job name, company, area shown with `.search-highlight` yellow background
+- **Back-to-top button**: floating `↑` button appears after scrolling 300px, smooth scroll to top
+- **Stats panel**: expandable with city distribution bar chart, education distribution, salary summary
 
 **Adding a new platform scraper**:
 1. Create `scrapers/<platform>/` with class inheriting `BaseScraper`
 2. Register in `runner.py`'s `get_available_scrapers()`
 3. Create `web/data/<platform>.json` placeholder
-4. Add to `AVAILABLE_SOURCES` in `app.js` and add a tab button in `index.html`
+4. Add to `AVAILABLE_SOURCES` in `app.js` and `SOURCE_CONFIG` in `render.js`
+5. Add a tab button in `index.html`
+6. Add platform color variables in `style.css` (`--color-<platform>`) and dark mode source-tag styles
 
 ## Key Design Decisions
 
@@ -82,6 +93,9 @@ This project uses a **static-site architecture**:
 - Cloudflare Pages deployment (replaced GitHub Pages) — faster CDN, easier management
 - 51job covers 17 cities (江苏13城 + 上海) for comprehensive coverage
 - GitHub Actions auto-commits data changes + deploys to Cloudflare Pages
+- Education filter uses level-based "及以上" logic instead of simple string matching
+- Salary filter parses 51job's Chinese salary format (千/月, 万/月, 元/天) to numeric k-values
+- Dark mode implemented with CSS custom properties + `[data-theme="dark"]` selector — no JS theme swapping of individual elements
 
 ## Common Issues
 
@@ -89,3 +103,5 @@ This project uses a **static-site architecture**:
 - **Boss直聘 blocked**: Boss uses warlock fingerprint + browser-check; Playwright headless completely blocked. Need non-headless browser or different approach
 - **Empty cities**: some cities (南京, 盐城) may return empty data — the scraper correctly handles this and skips
 - **Cloudflare Pages stale data**: deployment is near-instant, but browser cache may show old data briefly
+- **Salary filter edge cases**: salaries in non-standard formats (e.g. "面议", "元/天") are handled: "面议" has its own filter option, "元/天" is converted assuming 22 work days/month
+- **Dark mode missing styles**: new CSS properties should use CSS variables (not hardcoded colors) so dark mode works automatically. If a new element has hardcoded colors, add a `[data-theme="dark"]` override

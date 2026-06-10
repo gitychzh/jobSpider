@@ -38,7 +38,14 @@ function formatRelativeTime(dateStr) {
     return formatDate(dateStr);
 }
 
-function renderJobCard(job) {
+function highlightText(text, keyword) {
+    if (!keyword || !text) return text || '';
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escaped})`, 'gi');
+    return text.replace(regex, '<span class="search-highlight">$1</span>');
+}
+
+function renderJobCard(job, keyword) {
     const salary = job.salary || '薪资面议';
     const workArea = job.work_area || '';
     const workYear = job.work_year || '经验不限';
@@ -65,18 +72,23 @@ function renderJobCard(job) {
         tags.push(`<span class="meta-tag confirm-tag" title="确认时间: ${job.confirm_date}">✓${formatRelativeTime(job.confirm_date)}</span>`);
     }
 
+    // 搜索关键词高亮
+    const hlJobName = highlightText(job.job_name || '', keyword);
+    const hlCompany = highlightText(job.company_name || '', keyword);
+    const hlArea = highlightText(job.city || workArea, keyword);
+
     return `
     <div class="job-card" data-job-id="${job.job_id}">
         <div class="job-header">
             <div class="job-title">
-                <a href="${job.job_url || '#'}" target="_blank" rel="noopener">${job.job_name || ''}</a>
+                <a href="${job.job_url || '#'}" target="_blank" rel="noopener">${hlJobName}</a>
             </div>
             ${renderSourceTag(job.source)}
         </div>
-        <div class="job-company">${job.company_name || ''}</div>
+        <div class="job-company">${hlCompany}</div>
         <div class="job-meta">
             <span class="${salaryClass}">${salary}</span>
-            <span class="job-city-tag">${job.city || workArea}</span>
+            <span class="job-city-tag">${hlArea}</span>
             ${tags.join('')}
         </div>
     </div>`;
@@ -92,7 +104,7 @@ function renderJobList(jobs, keyword) {
         }
         return;
     }
-    el.innerHTML = jobs.map(renderJobCard).join('');
+    el.innerHTML = jobs.map(j => renderJobCard(j, keyword)).join('');
 }
 
 function renderStats(stats) {

@@ -6,17 +6,33 @@
  *  - 实时搜索（debounce）
  *  - 刷新按钮
  *  - 信息栏提示
- *  - 学历筛选
+ *  - 学历筛选（及以上逻辑）
+ *  - 薪资范围筛选
+ *  - 搜索关键词高亮
+ *  - 深色模式切换
+ *  - 回到顶部按钮
  *  - 清空筛选
  */
 const PER_PAGE = 50;
 const AVAILABLE_SOURCES = ['job51', 'zhilian', 'boss'];
+
+// 学历等级映射（用于"及以上"筛选）
+const EDU_LEVELS = {
+    '初中': 1, '初中及以下': 1,
+    '高中': 2,
+    '中专': 3, '中技': 3, '中专/中技': 3,
+    '大专': 4,
+    '本科': 5,
+    '硕士': 6,
+    '博士': 7,
+};
 
 let currentSource = 'job51';
 let currentPage = 1;
 let currentKeyword = '';
 let currentCity = '';
 let currentEducation = '';
+let currentSalaryRange = '';
 let allJobsCache = {};
 
 // ─── 平台切换 ────────────────────────────
@@ -26,10 +42,12 @@ function switchSource(source) {
     currentKeyword = '';
     currentCity = '';
     currentEducation = '';
+    currentSalaryRange = '';
 
     document.getElementById('searchBox').value = '';
     document.getElementById('cityFilter').value = '';
     document.getElementById('educationFilter').value = '';
+    document.getElementById('salaryFilter').value = '';
 
     // 更新tab样式
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -155,6 +173,7 @@ async function loadJobs(page) {
     currentCity = document.getElementById('cityFilter').value;
     currentKeyword = document.getElementById('searchBox').value.trim();
     currentEducation = document.getElementById('educationFilter').value;
+    currentSalaryRange = document.getElementById('salaryFilter').value;
 
     renderLoading();
 
@@ -172,12 +191,35 @@ async function loadJobs(page) {
         filtered = filtered.filter(j => j.city === currentCity);
     }
 
-    // 学历筛选（模糊匹配，因为51job的学历格式多样）
+    // 学历筛选（及以上逻辑）
     if (currentEducation) {
+        const minLevel = EDU_LEVELS[currentEducation.replace('及以上', '')] || EDU_LEVELS[currentEducation] || 0;
         filtered = filtered.filter(j => {
-            const edu = (j.education || '').toLowerCase();
-            const target = currentEducation.toLowerCase();
-            return edu.includes(target) || edu === target;
+            const edu = (j.education || '').trim();
+            const level = EDU_LEVELS[edu] || 0;
+            // "及以上"意味着：如果筛选条件含"及以上"，则匹配 >= minLevel
+            // 如果不含"及以上"（如博士、中专/中技），则精确匹配或模糊匹配
+            if (currentEducation.includes('及以上')) {
+                return level >= minLevel;
+            }
+            // 精确筛选：模糊匹配
+            return edu.includes(currentEducation.replace('及以上', '')) || edu === currentEducation;
+        });
+    }
+
+    // 薪资范围筛选
+    if (currentSalaryRange) {
+        filtered = filtered.filter(j => {
+            const salary = j.salary || '';
+            if (currentSalaryRange === 'negotiable') {
+                return salary === '薪资面议' || !salary;
+            }
+            // 解析薪资范围（格式如 "8-10千/月" 或 "1-1.5万/月"）
+            const monthly = parseSalaryMonthly(salary);
+            if (monthly === null) return false;
+            const [minK, maxK] = parseSalaryFilter(currentSalaryRange);
+            if (maxK === null) return monthly >= minK; // e.g. "50k+"
+            return monthly >= minK && monthly <= maxK;
         });
     }
 
@@ -210,7 +252,8 @@ async function loadJobs(page) {
     let infoParts = [];
     if (currentKeyword) infoParts.push(`搜索「${currentKeyword}」`);
     if (currentCity) infoParts.push(currentCity);
-    if (currentEducation) infoParts.push(currentEducation + '及以上');
+    if (currentEducation) infoParts.push(currentEducation);
+    if (currentSalaryRange) infoParts.push(salaryFilterLabel(currentSalaryRange));
     if (infoParts.length > 0) {
         showInfo(`${infoParts.join(' · ')} → ${total} 条`);
     }
@@ -244,14 +287,83 @@ function filterJobs() {
     loadJobs(1);
 }
 
+// ─── 薪资解析辅助 ────────────────────────────
+function parseSalaryMonthly(salaryStr) {
+    if (!salaryStr || salaryStr === '薪资面议') return null;
+    // Match patterns like "8-10千/月", "1-1.5万/月", "10-20千/月", "150-200元/天"
+    const match = salaryStr.match(/([\d.]+)-([\d.]+)(千|万)\/月/);
+    if (!match) {
+        // Try per-day: "150-200元/天" → assume 22 work days
+        const dayMatch = salaryStr.match(/([\d.]+)-([\d.]+)元\/天/);
+        if (dayMatch) {
+            const avg = ((parseFloat(dayMatch[1]) + parseFloat(dayMatch[2])) / 2) * 22 / 1000;
+            return avg; // in k
+        }
+        return null;
+    }
+    const low = parseFloat(match[1]);
+    const high = parseFloat(match[2]);
+    const unit = match[3]; // 千 or 万
+    const avg = (low + high) / 2;
+    return unit === '万' ? avg * 10 : avg; // in k (千)
+}
+
+function parseSalaryFilter(filterVal) {
+    // "0-3k" → [0, 3], "3-5k" → [3, 5], "50k+" → [50, null]
+    if (filterVal.endsWith('+')) return [parseFloat(filterVal.replace('k+', '')), null];
+    const parts = filterVal.split('-');
+    const maxPart = parts[1].replace('k', '');
+    return [parseFloat(parts[0]), parseFloat(maxPart)];
+}
+
+function salaryFilterLabel(filterVal) {
+    const labels = {
+        '0-3k': '3k以下', '3-5k': '3-5k', '5-10k': '5-10k',
+        '10-20k': '10-20k', '20-50k': '20-50k', '50k+': '50k以上',
+        'negotiable': '薪资面议',
+    };
+    return labels[filterVal] || filterVal;
+}
+
+// ─── 深色模式 ────────────────────────────
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? '' : 'dark';
+    document.documentElement.setAttribute('data-theme', next || 'light');
+    if (!next) document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('theme', next || 'light');
+    document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
+}
+
+function initTheme() {
+    const saved = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = saved || (prefersDark ? 'dark' : 'light');
+    if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        const btn = document.getElementById('themeToggle');
+        if (btn) btn.textContent = '☀️';
+    }
+}
+
+// ─── 回到顶部 ────────────────────────────
+function initBackToTop() {
+    const btn = document.getElementById('backToTop');
+    window.addEventListener('scroll', () => {
+        btn.classList.toggle('visible', window.scrollY > 300);
+    }, { passive: true });
+}
+
 // ─── 清空筛选 ────────────────────────────
 function clearFilters() {
     document.getElementById('searchBox').value = '';
     document.getElementById('cityFilter').value = '';
     document.getElementById('educationFilter').value = '';
+    document.getElementById('salaryFilter').value = '';
     currentKeyword = '';
     currentCity = '';
     currentEducation = '';
+    currentSalaryRange = '';
     loadJobs(1);
 }
 
@@ -275,6 +387,10 @@ function debounceSearch() {
 
 // ─── 初始化 ────────────────────────────
 async function init() {
+    // 初始化主题和回到顶部
+    initTheme();
+    initBackToTop();
+
     // 加载统计数据确定哪些平台可用
     let availableSet = new Set(['job51']);
 

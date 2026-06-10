@@ -16,6 +16,7 @@
 <body>
 
 <div class="header">
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="切换主题">🌙</button>
     <h1>🔍 招聘信息聚合</h1>
     <div class="subtitle">多平台招聘数据一览 · 江苏上海17城</div>
     <div class="stats-row">
@@ -48,13 +49,24 @@
     <label>学历</label>
     <select id="educationFilter" onchange="loadJobs(1)">
         <option value="">不限</option>
-        <option value="大专">大专</option>
-        <option value="本科">本科</option>
-        <option value="硕士">硕士</option>
         <option value="博士">博士</option>
+        <option value="硕士">硕士及以上</option>
+        <option value="本科">本科及以上</option>
+        <option value="大专">大专及以上</option>
         <option value="中专">中专/中技</option>
         <option value="高中">高中</option>
         <option value="初中">初中及以下</option>
+    </select>
+    <label>薪资</label>
+    <select id="salaryFilter" onchange="loadJobs(1)">
+        <option value="">不限</option>
+        <option value="0-3k">3k以下</option>
+        <option value="3-5k">3k-5k</option>
+        <option value="5-10k">5k-10k</option>
+        <option value="10-20k">10k-20k</option>
+        <option value="20-50k">20k-50k</option>
+        <option value="50k+">50k以上</option>
+        <option value="negotiable">薪资面议</option>
     </select>
     <label>排序</label>
     <select id="sortField" onchange="loadJobs(1)">
@@ -93,6 +105,8 @@
     <p>jobSpider · 数据来自51job等公开招聘平台 · 自动更新</p>
     <p>仅展示近1个月发布的职位 · 数据仅供参考</p>
 </footer>
+
+<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="回到顶部">↑</button>
 
 <script src="js/render.js"></script>
 <script src="js/app.js"></script>
